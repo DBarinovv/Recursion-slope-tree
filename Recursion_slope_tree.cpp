@@ -6,7 +6,7 @@
 
 const int C_max_len = 20;
 
-const char *s = "(2+3)*4/(9-4)";
+const char *s = "(2+x)*4/(9-4)";
 
 //=============================================================================
 
@@ -33,6 +33,8 @@ node_t* Get_E ();
 node_t* Get_T ();
 
 node_t* Get_P ();
+
+node_t *Get_Id ();
 
 node_t* Get_N ();
 
@@ -116,13 +118,9 @@ node_t* Get_E ()
 
         node_t* node2 = Get_T ();
 
-//        printf ("NODE2->data = %s\n", node2->data);
-
         if (op == '+') new_res = Create_Node ("+", "op");
         else           new_res = Create_Node ("-", "op");
 
-        printf ("NODE1->data = %s\n", node1->data);
-        printf ("NODE2->data = %s\n\n", node2->data);
         new_res->left  = node1;
         new_res->right = node2;
 
@@ -178,15 +176,37 @@ node_t* Get_P ()
         if (*s == ')')
         {
             s++;
-//            return Create_Node (helper->data, "int");
             return helper;
         }
         else Sin_Error ("Get_P");
+    }
+    else if ('a' <= *s && *s <= 'z')
+    {
+        return Get_Id ();
     }
     else
     {
         return Get_N ();
     }
+}
+
+//-----------------------------------------------------------------------------
+
+node_t *Get_Id ()
+{
+    char *helper = (char *) calloc (C_max_len, sizeof (char));
+
+    int pos = 0;
+    helper[pos++] = *s;
+    s++;
+
+    while ('a' <= *s && *s <= 'z')
+    {
+        helper[pos++] = *s;
+        s++;
+    }
+
+    return Create_Node (helper, "str");
 }
 
 //-----------------------------------------------------------------------------
@@ -243,14 +263,12 @@ void Print_PNG_Labels (node_t *node, FILE *fout)
 {
     if (node -> left)
     {
-//        fprintf (fout, "%p [label=\"%s\"];\n", node->data, node->data);
         fprintf (fout, "\"%p\" [label=\"%s\"];\n", (node -> left) -> data, (node -> left) -> data);
         Print_PNG_Labels (node -> left, fout);
     }
 
     if (node -> right)
     {
-//        fprintf (fout, "%p [label=\"%s\"];\n", node->data, node->data);
         fprintf (fout, "\"%p\" [label=\"%s\"];\n", (node -> right) -> data, (node -> right) -> data);
         Print_PNG_Labels (node -> right, fout);
     }
