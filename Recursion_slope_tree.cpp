@@ -6,7 +6,7 @@
 
 const int C_max_len = 20;
 
-const char *s = "(2+x)*4/(9-4)";
+const char *C_string = "";
 
 //=============================================================================
 
@@ -21,8 +21,6 @@ struct node_t
 //=============================================================================
 
 node_t *Create_Node (char *data, char *type);
-
-void *Add_Node (node_t *node);
 
 //-----------------------------------------------------------------------------
 
@@ -52,17 +50,24 @@ void Print_PNG        (node_t *node, FILE *fout);
 
 //=============================================================================
 
+void Simplify_Tree (node_t *node);
+
+void Unit (node_t *node);
+
+//=============================================================================
+
 int main ()
 {
     node_t* node = Get_G ();
-    printf ("FIRST\n");
-    printf ("NODE = %p\n", node);
+
+    Simplify_Tree (node);
+
     PNG_Dump (node);
-    printf ("SECOND\n");
+
+    printf ("END!\n");
 
     return 0;
 }
-
 
 //=============================================================================
 
@@ -80,19 +85,13 @@ node_t* Create_Node (char *data, char *type)
     return node;
 }
 
-//-----------------------------------------------------------------------------
-
-void *Add_Node (node_t *node)
-{
-}
-
 //=============================================================================
 
 node_t* Get_G ()
 {
     node_t* res = Get_E ();
 
-    if (*s == '\0')
+    if (*C_string == '\0')
         return res;
     else
     {
@@ -109,12 +108,10 @@ node_t* Get_E ()
     node_t* node1 = Get_T ();
     node_t* new_res = nullptr;
 
-//    printf ("NODE1->data = %s\n", node1->data);
-
-    while (*s == '+' || *s == '-')
+    while (*C_string == '+' || *C_string == '-')
     {
-        char op = *s;
-        s++;
+        char op = *C_string;
+        C_string++;
 
         node_t* node2 = Get_T ();
 
@@ -127,8 +124,6 @@ node_t* Get_E ()
         node1 = new_res;
     }
 
-//    printf ("RES = %p\n", res);
-
     return node1;
 }
 
@@ -138,12 +133,10 @@ node_t* Get_T ()
 {
     node_t* node1 = Get_P ();
 
-//    printf ("NODE1->data = %s\n", node1->data);
-
-    while (*s == '*' || *s == '/')
+    while (*C_string == '*' || *C_string == '/')
     {
-        char op = *s;
-        s++;
+        char op = *C_string;
+        C_string++;
 
         node_t* node2 = Get_P ();
 
@@ -151,15 +144,11 @@ node_t* Get_T ()
         if   (op == '*') new_res = Create_Node ("*", "op");
         else             new_res = Create_Node ("/", "op");
 
-//        printf ("NEW_RES->data = %s\n", new_res->data);
-
         new_res->left  = node1;
         new_res->right = node2;
 
         node1 = new_res;
     }
-
-//    printf ("RES = %p\n", res);
 
     return node1;
 }
@@ -168,19 +157,19 @@ node_t* Get_T ()
 
 node_t* Get_P ()
 {
-    if (*s == '(')
+    if (*C_string == '(')
     {
-        s++;
+        C_string++;
         node_t* helper = Get_E ();
 
-        if (*s == ')')
+        if (*C_string == ')')
         {
-            s++;
+            C_string++;
             return helper;
         }
         else Sin_Error ("Get_P");
     }
-    else if ('a' <= *s && *s <= 'z')
+    else if ('a' <= *C_string && *C_string <= 'z')
     {
         return Get_Id ();
     }
@@ -197,13 +186,13 @@ node_t *Get_Id ()
     char *helper = (char *) calloc (C_max_len, sizeof (char));
 
     int pos = 0;
-    helper[pos++] = *s;
-    s++;
+    helper[pos++] = *C_string;
+    C_string++;
 
-    while ('a' <= *s && *s <= 'z')
+    while ('a' <= *C_string && *C_string <= 'z')
     {
-        helper[pos++] = *s;
-        s++;
+        helper[pos++] = *C_string;
+        C_string++;
     }
 
     return Create_Node (helper, "str");
@@ -215,19 +204,17 @@ node_t* Get_N ()
 {
     int val = 0;
 
-    val = val * 10 + (*s - '0');
-    s++;
+    val = val * 10 + (*C_string - '0');
+    C_string++;
 
-    while ('0' <= *s && *s <= '9')
+    while ('0' <= *C_string && *C_string <= '9')
     {
-        val = val * 10 + (*s - '0');
-        s++;
+        val = val * 10 + (*C_string - '0');
+        C_string++;
     }
 
-//    node_t *node = Create_Node (itoa (val), "int");
     char *helper = (char *) calloc (C_max_len, sizeof (char));
     itoa (val, helper, 10);
-
 
     return Create_Node (helper, "int");
 }
@@ -288,5 +275,59 @@ void Print_PNG (node_t *node, FILE *fout)
     {
         fprintf (fout, "\"%p\"->\"%p\";\n", node -> data, (node -> right) -> data);
         Print_PNG (node -> right, fout);
+    }
+
+}
+
+//=============================================================================
+
+void Simplify_Tree (node_t *node)
+{
+    if (node->left && ((node->left)->left || (node->left)->right))
+    {
+        Simplify_Tree (node->left);
+    }
+
+    if (node->right && ((node->right)->left || (node->right)->right))
+    {
+        Simplify_Tree (node->right);
+    }
+
+    Unit (node);
+}
+
+//-----------------------------------------------------------------------------
+
+void Unit (node_t *node)
+{
+    if (strcmp ((node->left)->type, "int") == 0 && strcmp ((node->right)->type, "int") == 0)
+    {
+        if (strcmp (node->type, "op") == 0)
+        {
+            char *helper = (char *) calloc (C_max_len, sizeof (char));
+
+            if (strcmp (node->data, "+") == 0)
+            {
+                node->data = itoa (atoi ((node->left)->data) + atoi ((node->right)->data), helper, 10);
+            }
+            else if (strcmp (node->data, "-") == 0)
+            {
+                node->data = itoa (atoi ((node->left)->data) - atoi ((node->right)->data), helper, 10);
+            }
+            else if (strcmp (node->data, "*") == 0)
+            {
+                node->data = itoa (atoi ((node->left)->data) * atoi ((node->right)->data), helper, 10);
+            }
+            else if (strcmp (node->data, "/") == 0)
+            {
+                node->data = itoa (atoi ((node->left)->data) / atoi ((node->right)->data), helper, 10);
+            }
+            node->type = "int";
+
+            free (node->left);
+            node->left = nullptr;
+            free (node->right);
+            node->right = nullptr;
+        }
     }
 }
