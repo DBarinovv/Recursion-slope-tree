@@ -1,26 +1,27 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 //=============================================================================
 
 const int C_max_len = 20;
 
-const char *C_string = "";
+const char *C_string = "sin(5)+sin(5*7)-cos(sin(2+3))";
 
 //=============================================================================
 
 struct node_t
 {
     char *data;
-    char *type;   // int, str, op
+    char *type;   // int, str, op, func
     node_t *left;
     node_t *right;
 };
 
 //=============================================================================
 
-node_t *Create_Node (char *data, char *type);
+node_t *Create_Node (const char *data, const char *type);
 
 //-----------------------------------------------------------------------------
 
@@ -32,7 +33,7 @@ node_t* Get_T ();
 
 node_t* Get_P ();
 
-node_t *Get_Id ();
+node_t* Get_Id ();
 
 node_t* Get_N ();
 
@@ -41,6 +42,10 @@ node_t* Get_N ();
 void Sin_Error (const char *name_of_func);
 
 //-----------------------------------------------------------------------------
+
+node_t* Case_Functions (const char *str);
+
+//=============================================================================
 
 void PNG_Dump (node_t *node);
 
@@ -60,7 +65,7 @@ int main ()
 {
     node_t* node = Get_G ();
 
-    Simplify_Tree (node);
+//    Simplify_Tree (node);
 
     PNG_Dump (node);
 
@@ -71,7 +76,7 @@ int main ()
 
 //=============================================================================
 
-node_t* Create_Node (char *data, char *type)
+node_t* Create_Node (const char *data, const char *type)
 {
     node_t *node = (node_t *) calloc (1, sizeof (node_t) + 2);
     (node -> data) = (char *) calloc (C_max_len, sizeof (char));
@@ -139,8 +144,8 @@ node_t* Get_T ()
         C_string++;
 
         node_t* node2 = Get_P ();
-
         node_t* new_res = nullptr;
+
         if   (op == '*') new_res = Create_Node ("*", "op");
         else             new_res = Create_Node ("/", "op");
 
@@ -195,6 +200,10 @@ node_t *Get_Id ()
         C_string++;
     }
 
+    node_t* node = Case_Functions (helper);
+
+    if (node != nullptr) return node;
+
     return Create_Node (helper, "str");
 }
 
@@ -224,6 +233,32 @@ node_t* Get_N ()
 void Sin_Error (const char *name_of_func)
 {
     printf ("SINT ERROR IN %s!\n", name_of_func);
+}
+
+//=============================================================================
+
+node_t* Case_Functions (const char *str)
+{
+    const char* functions[] = {"sin", "cos"};
+
+    for (int i = 0; i < sizeof (functions) / sizeof (char *); i++)
+    {
+        if (strcmp (functions[i], str) == 0)
+        {
+            node_t* argument = Get_P ();
+
+            char *helper = (char *) calloc (C_max_len, sizeof (char));
+            strcat (helper, functions[i]);
+            strcat (helper, "(");
+            strcat (helper, argument->data);
+            strcat (helper, ")");
+
+            argument->data = helper;
+            return argument;
+        }
+    }
+
+    return nullptr;
 }
 
 //=============================================================================
@@ -276,7 +311,6 @@ void Print_PNG (node_t *node, FILE *fout)
         fprintf (fout, "\"%p\"->\"%p\";\n", node -> data, (node -> right) -> data);
         Print_PNG (node -> right, fout);
     }
-
 }
 
 //=============================================================================
