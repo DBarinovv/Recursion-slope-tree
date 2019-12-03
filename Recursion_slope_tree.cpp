@@ -3,9 +3,17 @@
 #include <string.h>
 #include <math.h>
 
+#include "Enum.h"
+
 //=============================================================================
 
 const int C_max_len = 20;
+
+const int C_max_cnt_of_names = 10;
+
+char* *G_names = (char **) calloc (C_max_cnt_of_names, sizeof (char *));
+
+const char *C_functions[] = {"sin", "cos"};
 
 const char *C_string = "sin(5)+sin(5*7)-cos(sin(2+3))";
 
@@ -13,15 +21,15 @@ const char *C_string = "sin(5)+sin(5*7)-cos(sin(2+3))";
 
 struct node_t
 {
-    char *data;
-    char *type;   // int, str, op, func
+    int data;
+    int type;      // E_int, E_str, E_op
     node_t *left;
     node_t *right;
 };
 
 //=============================================================================
 
-node_t *Create_Node (const char *data, const char *type);
+node_t *Create_Node (const int data, const int type);
 
 //-----------------------------------------------------------------------------
 
@@ -45,6 +53,8 @@ void Sin_Error (const char *name_of_func);
 
 node_t* Case_Functions (const char *str);
 
+//bool What_Func (const char *str);
+
 //=============================================================================
 
 void PNG_Dump (node_t *node);
@@ -53,17 +63,25 @@ void Print_PNG_Labels (node_t *node, FILE *fout);
 
 void Print_PNG        (node_t *node, FILE *fout);
 
+void Print_Node_Data_In_Right_Way (node_t *node, FILE *fout);
+
 //=============================================================================
 
 void Simplify_Tree (node_t *node);
 
 void Unit (node_t *node);
 
+void Unit_For_Func (node_t *node, const int data);
+
 //=============================================================================
 
 int main ()
 {
     node_t* node = Get_G ();
+
+//    printf ("1)NODE->DATA = [%d], NODE->TYPE = [%d]\n", node->data, node->type);
+//    printf ("2)NODE->DATA = [%d], NODE->TYPE = [%d]\n", (node->left)->data, (node->left)->type);
+//    printf ("3)NODE->DATA = [%d], NODE->TYPE = [%d]\n", (node->right)->data, (node->right)->type);
 
 //    Simplify_Tree (node);
 
@@ -76,14 +94,12 @@ int main ()
 
 //=============================================================================
 
-node_t* Create_Node (const char *data, const char *type)
+node_t* Create_Node (const int data, const int type)
 {
     node_t *node = (node_t *) calloc (1, sizeof (node_t) + 2);
-    (node -> data) = (char *) calloc (C_max_len, sizeof (char));
-    (node -> type) = (char *) calloc (10, sizeof (char));
 
-    strcpy (node -> data, data);
-    strcpy (node -> type, type);
+    node -> data = data;
+    node -> type = type;
     node -> left  = nullptr;
     node -> right = nullptr;
 
@@ -120,8 +136,8 @@ node_t* Get_E ()
 
         node_t* node2 = Get_T ();
 
-        if (op == '+') new_res = Create_Node ("+", "op");
-        else           new_res = Create_Node ("-", "op");
+        if (op == '+') new_res = Create_Node (E_plus,  E_op);
+        else           new_res = Create_Node (E_minus, E_op);
 
         new_res->left  = node1;
         new_res->right = node2;
@@ -146,8 +162,8 @@ node_t* Get_T ()
         node_t* node2 = Get_P ();
         node_t* new_res = nullptr;
 
-        if   (op == '*') new_res = Create_Node ("*", "op");
-        else             new_res = Create_Node ("/", "op");
+        if   (op == '*') new_res = Create_Node (E_mult, E_op);
+        else             new_res = Create_Node (E_div , E_op);
 
         new_res->left  = node1;
         new_res->right = node2;
@@ -201,10 +217,21 @@ node_t *Get_Id ()
     }
 
     node_t* node = Case_Functions (helper);
-
     if (node != nullptr) return node;
 
-    return Create_Node (helper, "str");
+    static int cnt = 0;
+
+    for (int i = 0; i < C_max_cnt_of_names; i++)
+    {
+        if (strcmp (G_names[i], helper) == 0)
+        {
+            return Create_Node (i, E_str);
+        }
+    }
+
+    strcpy (G_names[cnt++], helper);
+
+    return Create_Node (cnt - 1, E_str);
 }
 
 //-----------------------------------------------------------------------------
@@ -222,10 +249,7 @@ node_t* Get_N ()
         C_string++;
     }
 
-    char *helper = (char *) calloc (C_max_len, sizeof (char));
-    itoa (val, helper, 10);
-
-    return Create_Node (helper, "int");
+    return Create_Node (val, E_int);
 }
 
 //-----------------------------------------------------------------------------
@@ -239,27 +263,47 @@ void Sin_Error (const char *name_of_func)
 
 node_t* Case_Functions (const char *str)
 {
-    const char* functions[] = {"sin", "cos"};
-
-    for (int i = 0; i < sizeof (functions) / sizeof (char *); i++)
+    for (int i = 0; i < sizeof (C_functions) / sizeof (C_functions[0]); i++)
     {
-        if (strcmp (functions[i], str) == 0)
+        if (strcmp (C_functions[i], str) == 0)
         {
-            node_t* argument = Get_P ();
+            node_t* node = nullptr;
 
-            char *helper = (char *) calloc (C_max_len, sizeof (char));
-            strcat (helper, functions[i]);
-            strcat (helper, "(");
-            strcat (helper, argument->data);
-            strcat (helper, ")");
+            if (str[0] == 's')
+            {
+                node = Create_Node (E_sin, E_op);
+            }
+            else
+            {
+                node = Create_Node (E_cos, E_op);
+            }
 
-            argument->data = helper;
-            return argument;
+            node->left = Get_P ();
+
+//            node_t *node = Create_Node (0, E_op);
+//            if (str[0] == 's') node->data = E_sin;
+//            else node->data = E_cos;
+//
+//            node->left = Get_P ();
+
+            return node;
         }
     }
 
     return nullptr;
 }
+
+//-----------------------------------------------------------------------------
+
+//bool What_Func (const char *str)
+//{
+//    const char *functions[] = {"sin", "cos"};
+//
+//    for (int i = 0; i < sizeof (functions) / sizeof (functions[0]); i++)
+//    {
+//        if (strcmp (functions[i], str) == 0) return true;
+//    }
+//}
 
 //=============================================================================
 
@@ -269,7 +313,9 @@ void PNG_Dump (node_t *node)
 
     fprintf (fout, "digraph\n");
     fprintf (fout, "{\n");
-    fprintf (fout, "\"%p\" [label=\"%s\"];\n", node->data, node->data);
+    fprintf (fout, "\"%p\" [label=\"", node);
+    Print_Node_Data_In_Right_Way (node, fout);
+    fprintf (fout, "\"]\n");
 
     Print_PNG_Labels (node, fout);
     Print_PNG        (node, fout);
@@ -285,13 +331,21 @@ void Print_PNG_Labels (node_t *node, FILE *fout)
 {
     if (node -> left)
     {
-        fprintf (fout, "\"%p\" [label=\"%s\"];\n", (node -> left) -> data, (node -> left) -> data);
+//        fprintf (fout, "\"%p\" [label=\"%d\"];\n", (node -> left) -> data, (node -> left) -> data);
+        fprintf (fout, "\"%p\" [label=\"", node->left);
+        Print_Node_Data_In_Right_Way (node->left, fout);
+        fprintf (fout, "\"]\n");
+
         Print_PNG_Labels (node -> left, fout);
     }
 
     if (node -> right)
     {
-        fprintf (fout, "\"%p\" [label=\"%s\"];\n", (node -> right) -> data, (node -> right) -> data);
+//        fprintf (fout, "\"%p\" [label=\"%d\"];\n", (node -> right) -> data, (node -> right) -> data);
+        fprintf (fout, "\"%p\" [label=\"", node->right);
+        Print_Node_Data_In_Right_Way (node->right, fout);
+        fprintf (fout, "\"]\n");
+
         Print_PNG_Labels (node -> right, fout);
     }
 }
@@ -302,14 +356,65 @@ void Print_PNG (node_t *node, FILE *fout)
 {
     if (node -> left)
     {
-        fprintf (fout, "\"%p\"->\"%p\";\n", node -> data, (node -> left) -> data);
+        fprintf (fout, "\"%p\"->\"%p\";\n", node, node->left);
         Print_PNG (node -> left, fout);
     }
 
     if (node -> right)
     {
-        fprintf (fout, "\"%p\"->\"%p\";\n", node -> data, (node -> right) -> data);
+        fprintf (fout, "\"%p\"->\"%p\";\n", node, node->right);
         Print_PNG (node -> right, fout);
+    }
+}
+
+//-----------------------------------------------------------------------------
+
+void Print_Node_Data_In_Right_Way (node_t *node, FILE *fout)
+{
+    if (node->type == E_int)
+    {
+        fprintf (fout, "%d", node->data);
+    }
+    else if (node->type == E_str)
+    {
+        fprintf (fout, "%s", G_names[node->data]);
+        printf ("%s\n", G_names[node->data]);
+    }
+    else if (node->type == E_op)
+    {
+        switch (node->data)
+        {
+            case (E_plus):
+            {
+                fprintf (fout, "+");
+                return ;
+            }
+            case (E_minus):
+            {
+                fprintf (fout, "-");
+                return ;
+            }
+            case (E_mult):
+            {
+                fprintf (fout, "*");
+                return ;
+            }
+            case (E_div):
+            {
+                fprintf (fout, "/");
+                return ;
+            }
+            case (E_sin):
+            {
+                fprintf (fout, "sin");
+                return ;
+            }
+            case (E_cos):
+            {
+                fprintf (fout, "cos");
+                return ;
+            }
+        }
     }
 }
 
@@ -327,41 +432,84 @@ void Simplify_Tree (node_t *node)
         Simplify_Tree (node->right);
     }
 
-    Unit (node);
+//    Unit (node);
 }
 
 //-----------------------------------------------------------------------------
 
-void Unit (node_t *node)
-{
-    if (strcmp ((node->left)->type, "int") == 0 && strcmp ((node->right)->type, "int") == 0)
-    {
-        if (strcmp (node->type, "op") == 0)
-        {
-            char *helper = (char *) calloc (C_max_len, sizeof (char));
+//////void Unit (node_t *node)
+//////{
+//////    if (strcmp ((node->left)->type, "int") == 0 && strcmp ((node->right)->type, "int") == 0)
+//////    {
+//////        if (strcmp (node->type, "op") == 0)
+//////        {
+//////            char *helper = (char *) calloc (C_max_len, sizeof (char));
+//////
+//////            if (strcmp (node->data, "+") == 0)
+//////            {
+//////                node->data = itoa (atoi ((node->left)->data) + atoi ((node->right)->data), helper, 10);
+//////            }
+//////            else if (strcmp (node->data, "-") == 0)
+//////            {
+//////                node->data = itoa (atoi ((node->left)->data) - atoi ((node->right)->data), helper, 10);
+//////            }
+//////            else if (strcmp (node->data, "*") == 0)
+//////            {
+//////                node->data = itoa (atoi ((node->left)->data) * atoi ((node->right)->data), helper, 10);
+//////            }
+//////            else if (strcmp (node->data, "/") == 0)
+//////            {
+//////                node->data = itoa (atoi ((node->left)->data) / atoi ((node->right)->data), helper, 10);
+//////            }
+//////            node->type = "int";
+//////
+//////            free (node->left);
+//////            node->left = nullptr;
+//////            free (node->right);
+//////            node->right = nullptr;
+//////        }
+//        else if (strcmp (node->type, "func") == 0)
+//        {
+//            Unit_For_Func (node, node->data);
+//        }
+//////    }
+//    else
+//    {
+//        if (strcmp ((node->left)->type, "func") == 0)
+//        {
+//            char *helper = (char *) calloc (C_max_len, sizeof (char));
+//
+//            int pos = 0;
+//            for (int i = 0; 'a' <= node->data[i] && node->data[i] <= 'z'; i++)
+//            {
+//                helper[pos++] = node->data[i];
+//            }
+//
+//        }
+//
+//        if (strcmp ((node->right)->type, "func") == 0)
+//        {
+//        }
+//    }
+////////}
 
-            if (strcmp (node->data, "+") == 0)
-            {
-                node->data = itoa (atoi ((node->left)->data) + atoi ((node->right)->data), helper, 10);
-            }
-            else if (strcmp (node->data, "-") == 0)
-            {
-                node->data = itoa (atoi ((node->left)->data) - atoi ((node->right)->data), helper, 10);
-            }
-            else if (strcmp (node->data, "*") == 0)
-            {
-                node->data = itoa (atoi ((node->left)->data) * atoi ((node->right)->data), helper, 10);
-            }
-            else if (strcmp (node->data, "/") == 0)
-            {
-                node->data = itoa (atoi ((node->left)->data) / atoi ((node->right)->data), helper, 10);
-            }
-            node->type = "int";
+//-----------------------------------------------------------------------------
 
-            free (node->left);
-            node->left = nullptr;
-            free (node->right);
-            node->right = nullptr;
-        }
-    }
-}
+//void Unit_For_Func (node_t *node, const char *data)
+//{
+//    char *helper = (char *) calloc (C_max_len, sizeof (char));
+//
+//    int pos = 0;
+//    for (int i = 0; 'a' <= data[i] && data[i] <= 'z'; i++)
+//    {
+//        helper[pos++] = data[i];
+//    }
+//
+//    for (int i = 0; i < sizeof (C_functions) / sizeof (C_functions[0]); i++)
+//    {
+//        if (strcmp (C_functions[i], helper) == 0)
+//        {
+//            return;
+//        }
+//    }
+//}
