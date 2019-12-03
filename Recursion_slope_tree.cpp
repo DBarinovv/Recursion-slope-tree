@@ -36,10 +36,11 @@ char* *G_names = (char **) calloc (C_max_cnt_of_names, sizeof (char *));
 const func_t C_functions[] = {
                             {"sin", E_sin},
                             {"cos", E_cos},
-                            {"pow", E_pow}
+                            {"pow", E_pow},
+                            {"dif", E_dif}
                              };
 
-const char *C_string = "pow(2,5)";
+const char *C_string = "dif(x*pow(2,5))";
 
 //=============================================================================
 
@@ -85,7 +86,9 @@ void Simplify_Tree (node_t* node);
 
 void Unit (node_t* node);
 
-void Unit_For_Func (node_t* node, const int data);
+node_t* Case_Differentiation (node_t* node);
+
+node_t* Unit_Differentiation (node_t* node);
 
 //=============================================================================
 
@@ -322,6 +325,10 @@ node_t* Case_Functions (const char *str)
 
             switch (C_functions[i].num)
             {
+                case (E_default):
+                {
+                    printf ("OSHIBKA V INITIALIZATION, ERROR!!!\n");
+                }
                 case (E_sin):
                 {
                     node->left = Get_P ();
@@ -337,6 +344,11 @@ node_t* Case_Functions (const char *str)
                     node = Get_P_With_Comma ();
                     node->data = E_pow;
 
+                    break;
+                }
+                case (E_dif):
+                {
+                    node->left = Get_P ();
                     break;
                 }
                 default:
@@ -461,6 +473,11 @@ void Print_Node_Data_In_Right_Way (node_t* node, FILE *fout)
                 fprintf (fout, "pow");
                 return;
             }
+            case (E_dif):
+            {
+                fprintf (fout, "dif");
+                return;
+            }
             default:
                 printf ("NET TAKOGO OPERATORA, ERROR!!!\n");
         }
@@ -552,6 +569,11 @@ void Unit (node_t* node)
                         node->data = (int) floor (C_accuracy * cos ((node->left)->data / C_accuracy));
                         break;
                     }
+                    case (E_dif):
+                    {
+                        node = Case_Differentiation (node);
+                        break;
+                    }
                     default:
                         printf ("NET TAKOY FUNC (Unit), ERROR!!!\n");
                 }
@@ -562,5 +584,40 @@ void Unit (node_t* node)
                 node->left = nullptr;
             }
         }
+    }
+}
+//-----------------------------------------------------------------------------
+
+node_t* Case_Differentiation (node_t* node)
+{
+    node_t* res = Unit_Differentiation (node->left);
+
+//    free (node);
+//    node = nullptr;
+
+    return res;
+}
+
+//-----------------------------------------------------------------------------
+
+node_t* Unit_Differentiation (node_t* node)
+{
+    if (node->type == E_int)
+    {
+        node->data = 0;
+        return node;
+    }
+
+    if (node->type == E_str)
+    {
+        node->data = 1;
+        node->type = E_int;
+
+        return node;
+    }
+
+    if (node->type == E_op)
+    {
+
     }
 }
