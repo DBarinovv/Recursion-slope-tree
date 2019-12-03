@@ -11,6 +11,8 @@ const int C_max_len = 20;
 
 const int C_max_cnt_of_names = 10;
 
+const int C_accuracy = pow (10, 6);
+
 char* *G_names = (char **) calloc (C_max_cnt_of_names, sizeof (char *));
 
 const char *C_functions[] = {"sin", "cos"};
@@ -53,8 +55,6 @@ void Sin_Error (const char *name_of_func);
 
 node_t* Case_Functions (const char *str);
 
-//bool What_Func (const char *str);
-
 //=============================================================================
 
 void PNG_Dump (node_t *node);
@@ -79,11 +79,7 @@ int main ()
 {
     node_t* node = Get_G ();
 
-//    printf ("1)NODE->DATA = [%d], NODE->TYPE = [%d]\n", node->data, node->type);
-//    printf ("2)NODE->DATA = [%d], NODE->TYPE = [%d]\n", (node->left)->data, (node->left)->type);
-//    printf ("3)NODE->DATA = [%d], NODE->TYPE = [%d]\n", (node->right)->data, (node->right)->type);
-
-//    Simplify_Tree (node);
+    Simplify_Tree (node);
 
     PNG_Dump (node);
 
@@ -249,6 +245,8 @@ node_t* Get_N ()
         C_string++;
     }
 
+    val *= C_accuracy;
+
     return Create_Node (val, E_int);
 }
 
@@ -280,30 +278,12 @@ node_t* Case_Functions (const char *str)
 
             node->left = Get_P ();
 
-//            node_t *node = Create_Node (0, E_op);
-//            if (str[0] == 's') node->data = E_sin;
-//            else node->data = E_cos;
-//
-//            node->left = Get_P ();
-
             return node;
         }
     }
 
     return nullptr;
 }
-
-//-----------------------------------------------------------------------------
-
-//bool What_Func (const char *str)
-//{
-//    const char *functions[] = {"sin", "cos"};
-//
-//    for (int i = 0; i < sizeof (functions) / sizeof (functions[0]); i++)
-//    {
-//        if (strcmp (functions[i], str) == 0) return true;
-//    }
-//}
 
 //=============================================================================
 
@@ -331,7 +311,6 @@ void Print_PNG_Labels (node_t *node, FILE *fout)
 {
     if (node -> left)
     {
-//        fprintf (fout, "\"%p\" [label=\"%d\"];\n", (node -> left) -> data, (node -> left) -> data);
         fprintf (fout, "\"%p\" [label=\"", node->left);
         Print_Node_Data_In_Right_Way (node->left, fout);
         fprintf (fout, "\"]\n");
@@ -341,7 +320,6 @@ void Print_PNG_Labels (node_t *node, FILE *fout)
 
     if (node -> right)
     {
-//        fprintf (fout, "\"%p\" [label=\"%d\"];\n", (node -> right) -> data, (node -> right) -> data);
         fprintf (fout, "\"%p\" [label=\"", node->right);
         Print_Node_Data_In_Right_Way (node->right, fout);
         fprintf (fout, "\"]\n");
@@ -373,12 +351,11 @@ void Print_Node_Data_In_Right_Way (node_t *node, FILE *fout)
 {
     if (node->type == E_int)
     {
-        fprintf (fout, "%d", node->data);
+        fprintf (fout, "%lf", (double) (node->data) / C_accuracy);
     }
     else if (node->type == E_str)
     {
         fprintf (fout, "%s", G_names[node->data]);
-        printf ("%s\n", G_names[node->data]);
     }
     else if (node->type == E_op)
     {
@@ -387,33 +364,35 @@ void Print_Node_Data_In_Right_Way (node_t *node, FILE *fout)
             case (E_plus):
             {
                 fprintf (fout, "+");
-                return ;
+                return;
             }
             case (E_minus):
             {
                 fprintf (fout, "-");
-                return ;
+                return;
             }
             case (E_mult):
             {
                 fprintf (fout, "*");
-                return ;
+                return;
             }
             case (E_div):
             {
                 fprintf (fout, "/");
-                return ;
+                return;
             }
             case (E_sin):
             {
                 fprintf (fout, "sin");
-                return ;
+                return;
             }
             case (E_cos):
             {
                 fprintf (fout, "cos");
-                return ;
+                return;
             }
+            default:
+                printf ("NET TAKOGO OPERATORA, ERROR!!!\n");
         }
     }
 }
@@ -432,66 +411,84 @@ void Simplify_Tree (node_t *node)
         Simplify_Tree (node->right);
     }
 
-//    Unit (node);
+    Unit (node);
 }
 
 //-----------------------------------------------------------------------------
 
-//////void Unit (node_t *node)
-//////{
-//////    if (strcmp ((node->left)->type, "int") == 0 && strcmp ((node->right)->type, "int") == 0)
-//////    {
-//////        if (strcmp (node->type, "op") == 0)
-//////        {
-//////            char *helper = (char *) calloc (C_max_len, sizeof (char));
-//////
-//////            if (strcmp (node->data, "+") == 0)
-//////            {
-//////                node->data = itoa (atoi ((node->left)->data) + atoi ((node->right)->data), helper, 10);
-//////            }
-//////            else if (strcmp (node->data, "-") == 0)
-//////            {
-//////                node->data = itoa (atoi ((node->left)->data) - atoi ((node->right)->data), helper, 10);
-//////            }
-//////            else if (strcmp (node->data, "*") == 0)
-//////            {
-//////                node->data = itoa (atoi ((node->left)->data) * atoi ((node->right)->data), helper, 10);
-//////            }
-//////            else if (strcmp (node->data, "/") == 0)
-//////            {
-//////                node->data = itoa (atoi ((node->left)->data) / atoi ((node->right)->data), helper, 10);
-//////            }
-//////            node->type = "int";
-//////
-//////            free (node->left);
-//////            node->left = nullptr;
-//////            free (node->right);
-//////            node->right = nullptr;
-//////        }
-//        else if (strcmp (node->type, "func") == 0)
-//        {
-//            Unit_For_Func (node, node->data);
-//        }
-//////    }
-//    else
-//    {
-//        if (strcmp ((node->left)->type, "func") == 0)
-//        {
-//            char *helper = (char *) calloc (C_max_len, sizeof (char));
-//
-//            int pos = 0;
-//            for (int i = 0; 'a' <= node->data[i] && node->data[i] <= 'z'; i++)
-//            {
-//                helper[pos++] = node->data[i];
-//            }
-//
-//        }
-//
-//        if (strcmp ((node->right)->type, "func") == 0)
-//        {
-//        }
-//    }
-////////}
+void Unit (node_t *node)
+{
+    if (node->right)
+    {
+        if ((node->left)->type == E_int && (node->right)->type == E_int)
+        {
+            if (node->type == E_op)
+            {
+                switch (node->data)
+                {
+                    case (E_plus):
+                    {
+                        node->data = (node->left)->data + (node->right)->data;
+                        break;
+                    }
+                    case (E_minus):
+                    {
+                        node->data = (node->left)->data - (node->right)->data;
+                        break;
+                    }
+                    case (E_mult):
+                    {
+                        node->data = (node->left)->data * (node->right)->data;
+                        break;
+                    }
+                    case (E_div):
+                    {
+                        node->data = (node->left)->data / (node->right)->data;
+                        break;
+                    }
+                    default:
+                        printf ("POKA CHTO NE PRIDUMAL, ERROR!!!\n");
+                }
+
+                node->type = E_int;
+
+                free (node->left);
+                node->left = nullptr;
+                free (node->right);
+                node->right = nullptr;
+            }
+        }
+    }
+    else
+    {
+        if (node->type == E_op)
+        {
+            if ((node->left)->type == E_int)
+            {
+                switch (node->data)
+                {
+                    case (E_sin):
+                    {
+                        node->data = (int) floor (C_accuracy * sin ((node->left)->data / C_accuracy));
+                        break;
+                    }
+                    case (E_cos):
+                    {
+                        node->data = (int) floor (C_accuracy * cos ((node->left)->data / C_accuracy));
+                        break;
+                    }
+                    default:
+                        printf ("NET TAKOY FUNC, ERROR!!!\n");
+                }
+
+                node->type = E_int;
+
+                free (node->left);
+                node->left = nullptr;
+            }
+        }
+    }
+}
 
 //-----------------------------------------------------------------------------
 
