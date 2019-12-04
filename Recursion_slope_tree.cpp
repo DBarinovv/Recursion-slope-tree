@@ -1,3 +1,7 @@
+//=============================================================================
+//                                INCLUDES                                    ;
+//=============================================================================
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -5,6 +9,8 @@
 
 #include "Enum.h"
 
+//=============================================================================
+//                               STRUCTURES                                   ;
 //=============================================================================
 
 struct func_t
@@ -23,6 +29,8 @@ struct node_t
     node_t* right;
 };
 
+//=============================================================================
+//                          GLOBAL/CONST VARIABLES                            ;
 //=============================================================================
 
 const int C_max_len = 20;
@@ -44,6 +52,8 @@ const func_t C_functions[] = {
 
 const char *C_string = "x*(2-1)";
 
+//=============================================================================
+//                              RECURSION SLOPE                               ;
 //=============================================================================
 
 node_t* Create_Node (const int data, const int type);
@@ -73,6 +83,8 @@ void Syntax_Error (const char *name_of_func);
 node_t* Case_Functions (const char *str);
 
 //=============================================================================
+//                             PNG DUMP FOR TREE                              ;
+//=============================================================================
 
 void PNG_Dump (node_t* node);
 
@@ -83,10 +95,18 @@ void Print_PNG        (node_t* node, FILE *fout);
 void Print_Node_Data_In_Right_Way (node_t* node, FILE *fout);
 
 //=============================================================================
+//                              SIMPLIFY TREE                                 ;
+//=============================================================================
 
 node_t* Simplify_Tree (node_t* node);
 
 node_t* Unit (node_t* node);
+
+void Unit_For_Oper_With_Two_Arg (node_t* node);
+
+void Unit_For_One_And_Zero (node_t* node);
+
+void Unit_For_Oper_With_One_Arg (node_t* node);
 
 node_t* Case_Differentiation (node_t* node);
 
@@ -533,183 +553,199 @@ node_t* Simplify_Tree (node_t* node)
 
 node_t* Unit (node_t* node)
 {
-    if (node->right)               // functions with 2 arguments
+    if (node->right)                // functions with 2 arguments
     {
         if ((node->left)->type == E_int && (node->right)->type == E_int)
         {
-            if (node->type == E_op)
-            {
-                switch (node->data)
-                {
-                    case (E_plus):
-                    {
-                        node->data = (node->left)->data + (node->right)->data;
-                        break;
-                    }
-                    case (E_minus):
-                    {
-                        node->data = (node->left)->data - (node->right)->data;
-                        break;
-                    }
-                    case (E_mult):
-                    {
-                        node->data = (node->left)->data * (node->right)->data / C_accuracy;
-                        break;
-                    }
-                    case (E_div):
-                    {
-                        node->data = (node->left)->data / (node->right)->data * C_accuracy;
-                        break;
-                    }
-                    case (E_pow):
-                    {
-                        node->data = (int) floor (C_accuracy * pow ((node->left)->data / C_accuracy, (node->right)->data / C_accuracy));
-                        break;
-                    }
-                    default:
-                        printf ("POKA CHTO NE PRIDUMAL, ERROR!!!\n");
-                }
-
-                node->type = E_int;
-
-                free (node->left);
-                node->left = nullptr;
-                free (node->right);
-                node->right = nullptr;
-            }
+            Unit_For_Oper_With_Two_Arg (node);
         }
-        else
+        else if (node->type == E_op)
         {
-            if (node->type == E_op)
-            {
-                if (node->data == E_mult)            // case  *0 || 0* || 1* || *1
-                {
-                    if (((node->left)->data == 0 && (node->left)->type  == E_int) ||                   // 0*
-                       ((node->right)->data == 0 && (node->right)->type == E_int))                     // *0
-                    {
-                        node->data = 0;
-                        node->type = E_int;
-
-                        free (node->left);
-                        node->left = nullptr;
-                        free (node->right);
-                        node->right = nullptr;
-                    }
-                    else if (((node->left)->data == 1 * C_accuracy && (node->left)->type == E_int))    // 1*
-                    {
-                        free (node->left);
-
-                        node->data  = (node->right)->data;
-                        node->type  = (node->right)->type;
-                        node->right = nullptr;
-                        node->left  = nullptr;
-                    }
-                    else if (((node->right)->data == 1 * C_accuracy && (node->right)->type == E_int))  // *1
-                    {
-                        free (node->right);
-
-                        node->data  = (node->left)->data;
-                        node->type  = (node->left)->type;
-                        node->right = nullptr;
-                        node->left  = nullptr;
-                    }
-                }
-                else if (node->data == E_plus)       // case  +0 || 0+
-                {
-                    if (((node->left)->data == 0 && (node->left)->type == E_int))
-                    {
-                        free (node->left);
-                        node->left = nullptr;
-
-                        node->data = node->right->data;
-                        node->type = node->right->type;
-
-                        free (node->right);
-                        node->right = nullptr;
-                    }
-                    else if (((node->right)->data == 0 && (node->right)->type == E_int))
-                    {
-                        free (node->right);
-                        node->right = nullptr;
-
-                        node->data = node->left->data;
-                        node->type = node->left->type;
-
-                        free (node->left);
-                        node->left = nullptr;
-                    }
-                }
-                else if (node->data == E_minus)      // case  -0
-                {
-                    if (((node->right)->data == 0 && (node->right)->type == E_int))
-                    {
-                        free (node->right);
-                        node->right = nullptr;
-
-                        node->data = node->left->data;
-                        node->type = node->left->type;
-
-                        free (node->left);
-                        node->left = nullptr;
-                    }
-                }
-            }
+            Unit_For_One_And_Zero (node);
         }
     }
-    else                           // functions with 1 argument
+    else if (node->type == E_op)    // functions with 1 argument
     {
-        if (node->type == E_op)
-        {
-            if ((node->left)->type == E_int)
-            {
-                switch (node->data)
-                {
-                    case (E_sin):
-                    {
-                        node->data = (int) floor (C_accuracy * sin ((node->left)->data / C_accuracy));
-                        break;
-                    }
-                    case (E_cos):
-                    {
-                        node->data = (int) floor (C_accuracy * cos ((node->left)->data / C_accuracy));
-                        break;
-                    }
-                    case (E_dif):
-                    {
-                        node = Case_Differentiation (node);
-                        break;
-                    }
-                    case (E_log):
-                    {
-                        node->data = (int) floor (C_accuracy * log ((node->left)->data / C_accuracy));
-                        break;
-                    }
-                    case (E_exp):
-                    {
-                        node->data = (int) floor (C_accuracy * exp ((node->left)->data / C_accuracy));
-                        break;
-                    }
-                    default:
-                        printf ("NET TAKOY FUNC (Unit), ERROR!!!\n");
-                }
-
-                node->type = E_int;
-
-                free (node->left);
-                node->left = nullptr;
-            }
-            else
-            {
-                if (node->data == E_dif)
-                {
-                    node = Case_Differentiation (node);
-                }
-            }
-        }
+        Unit_For_Oper_With_One_Arg (node);
     }
 
     return node;
 }
+
+//-----------------------------------------------------------------------------
+
+void Unit_For_Oper_With_Two_Arg (node_t* node)
+{
+    if (node->type == E_op)
+    {
+        switch (node->data)
+        {
+            case (E_plus):
+            {
+                node->data = (node->left)->data + (node->right)->data;
+                break;
+            }
+            case (E_minus):
+            {
+                node->data = (node->left)->data - (node->right)->data;
+                break;
+            }
+            case (E_mult):
+            {
+                node->data = (node->left)->data * (node->right)->data / C_accuracy;
+                break;
+            }
+            case (E_div):
+            {
+                node->data = (node->left)->data / (node->right)->data * C_accuracy;
+                break;
+            }
+            case (E_pow):
+            {
+                node->data = (int) floor (C_accuracy * pow ((node->left)->data / C_accuracy, (node->right)->data / C_accuracy));
+                break;
+            }
+            default:
+                printf ("POKA CHTO NE PRIDUMAL, ERROR!!!\n");
+        }
+
+        node->type = E_int;
+
+        free (node->left);
+        node->left = nullptr;
+        free (node->right);
+        node->right = nullptr;
+    }
+}
+
+//-----------------------------------------------------------------------------
+
+void Unit_For_One_And_Zero (node_t* node)
+{
+    if (node->data == E_mult)            // case  *0 || 0* || 1* || *1
+    {
+        if (((node->left)->data == 0 && (node->left)->type  == E_int) ||                   // 0*
+           ((node->right)->data == 0 && (node->right)->type == E_int))                     // *0
+        {
+            node->data = 0;
+            node->type = E_int;
+
+            free (node->left);
+            node->left = nullptr;
+            free (node->right);
+            node->right = nullptr;
+        }
+        else if (((node->left)->data == 1 * C_accuracy && (node->left)->type == E_int))    // 1*
+        {
+            free (node->left);
+
+            node->data  = (node->right)->data;
+            node->type  = (node->right)->type;
+            node->right = nullptr;
+            node->left  = nullptr;
+        }
+        else if (((node->right)->data == 1 * C_accuracy && (node->right)->type == E_int))  // *1
+        {
+            free (node->right);
+
+            node->data  = (node->left)->data;
+            node->type  = (node->left)->type;
+            node->right = nullptr;
+            node->left  = nullptr;
+        }
+    }
+    else if (node->data == E_plus)       // case  +0 || 0+
+    {
+        if (((node->left)->data == 0 && (node->left)->type == E_int))
+        {
+            free (node->left);
+            node->left = nullptr;
+
+            node->data = node->right->data;
+            node->type = node->right->type;
+
+            free (node->right);
+            node->right = nullptr;
+        }
+        else if (((node->right)->data == 0 && (node->right)->type == E_int))
+        {
+            free (node->right);
+            node->right = nullptr;
+
+            node->data = node->left->data;
+            node->type = node->left->type;
+
+            free (node->left);
+            node->left = nullptr;
+        }
+    }
+    else if (node->data == E_minus)      // case  -0
+    {
+        if (((node->right)->data == 0 && (node->right)->type == E_int))
+        {
+            free (node->right);
+            node->right = nullptr;
+
+            node->data = node->left->data;
+            node->type = node->left->type;
+
+            free (node->left);
+            node->left = nullptr;
+        }
+    }
+}
+
+//-----------------------------------------------------------------------------
+
+void Unit_For_Oper_With_One_Arg (node_t* node)
+{
+    if ((node->left)->type == E_int)
+    {
+        switch (node->data)
+        {
+            case (E_sin):
+            {
+                node->data = (int) floor (C_accuracy * sin ((node->left)->data / C_accuracy));
+                break;
+            }
+            case (E_cos):
+            {
+                node->data = (int) floor (C_accuracy * cos ((node->left)->data / C_accuracy));
+                break;
+            }
+            case (E_dif):
+            {
+                node = Case_Differentiation (node);
+                break;
+            }
+            case (E_log):
+            {
+                node->data = (int) floor (C_accuracy * log ((node->left)->data / C_accuracy));
+                break;
+            }
+            case (E_exp):
+            {
+                node->data = (int) floor (C_accuracy * exp ((node->left)->data / C_accuracy));
+                break;
+            }
+            default:
+                printf ("NET TAKOY FUNC (Unit), ERROR!!!\n");
+        }
+
+        node->type = E_int;
+
+        free (node->left);
+        node->left = nullptr;
+    }
+    else
+    {
+        if (node->data == E_dif)
+        {
+            node = Case_Differentiation (node);
+        }
+    }
+}
+
 //-----------------------------------------------------------------------------
 
 node_t* Case_Differentiation (node_t* node)
