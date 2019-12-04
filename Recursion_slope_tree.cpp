@@ -29,7 +29,7 @@ const int C_max_len = 20;
 
 const int C_max_cnt_of_names = 10;
 
-const int C_accuracy = pow (10, 4);
+const int C_accuracy = pow (10, 3);
 
 char* *G_names = (char **) calloc (C_max_cnt_of_names, sizeof (char *));
 
@@ -40,7 +40,7 @@ const func_t C_functions[] = {
                             {"dif", E_dif}
                              };
 
-const char *C_string = "dif(sin(5*x))";
+const char *C_string = "dif(sin(5*x))+dif(cos(5*x))";
 
 //=============================================================================
 
@@ -90,6 +90,8 @@ node_t* Case_Differentiation (node_t* node);
 
 node_t* Unit_Differentiation (node_t* node);
 
+node_t* Unit_Copy (node_t* node_res, node_t* node_cpy);
+
 //=============================================================================
 
 int main ()
@@ -98,7 +100,7 @@ int main ()
 
     node_t* node = Get_G ();
 
-//    node = Simplify_Tree (node);
+    node = Simplify_Tree (node);
     node = Simplify_Tree (node);
 
     PNG_Dump (node);
@@ -680,6 +682,10 @@ node_t* Case_Differentiation (node_t* node)
 #define NR\
     node->right
 
+#define CPY(where, from)                 \
+    where = CN(from->data, from->type);  \
+    where = Unit_Copy (where, from);
+
 
 node_t* Unit_Differentiation (node_t* node)
 {
@@ -762,7 +768,7 @@ node_t* Unit_Differentiation (node_t* node)
                 node_t* res = CN(E_mult, E_op);
 
                 res->left = CN(E_cos, E_op);
-                (res->left)->left = NL;
+                CPY((res->left)->left, NL)
 
                 res->right = UD(NL);
 
@@ -775,7 +781,7 @@ node_t* Unit_Differentiation (node_t* node)
 
                 res->left = CN(E_mult, E_op);
                 (res->left)->left = CN(E_sin, E_op);
-                ((res->left)->left)->left = NL;
+                CPY(((res->left)->left)->left, NL)
 
                 (res->left)->right = CN(-1 * C_accuracy, E_int);
 
@@ -802,3 +808,23 @@ node_t* Unit_Differentiation (node_t* node)
 #undef UF
 #undef NL
 #undef NR
+#undef CPY
+
+//-----------------------------------------------------------------------------
+
+node_t* Unit_Copy (node_t* node_res, node_t* node_cpy)
+{
+    if (node_cpy->left)
+    {
+        node_res->left = Create_Node ((node_cpy->left)->data, (node_cpy->left)->type);
+        Unit_Copy (node_res->left, node_cpy->left);
+    }
+
+    if (node_cpy->right)
+    {
+        node_res->right = Create_Node ((node_cpy->right)->data, (node_cpy->right)->type);
+        Unit_Copy (node_res->right, node_cpy->right);
+    }
+
+    return node_res;
+}
