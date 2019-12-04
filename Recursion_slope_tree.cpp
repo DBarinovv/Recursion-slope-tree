@@ -9,8 +9,8 @@
 
 struct func_t
 {
-    char *name;
-    int num;
+    const char *name;
+    const int num;
 };
 
 //-----------------------------------------------------------------------------
@@ -37,10 +37,12 @@ const func_t C_functions[] = {
                             {"sin", E_sin},
                             {"cos", E_cos},
                             {"pow", E_pow},
-                            {"dif", E_dif}
+                            {"dif", E_dif},
+                            {"log", E_log},
+                            {"exp", E_exp}
                              };
 
-const char *C_string = "dif(sin(5*x))+dif(cos(5*x))";
+const char *C_string = "dif(pow(2,x))";
 
 //=============================================================================
 
@@ -100,6 +102,7 @@ int main ()
 
     node_t* node = Get_G ();
 
+    node = Simplify_Tree (node);
     node = Simplify_Tree (node);
     node = Simplify_Tree (node);
 
@@ -354,6 +357,16 @@ node_t* Case_Functions (const char *str)
                     node->left = Get_P ();
                     break;
                 }
+                case (E_log):
+                {
+                    node->left = Get_P ();
+                    break;
+                }
+                case (E_exp):
+                {
+                    node->left = Get_P ();
+                    break;
+                }
                 default:
                     printf ("NET TAKOY FUNC (Case_Functions), ERROR!!!\n");
             }
@@ -481,6 +494,16 @@ void Print_Node_Data_In_Right_Way (node_t* node, FILE *fout)
                 fprintf (fout, "dif");
                 return;
             }
+            case (E_log):
+            {
+                fprintf (fout, "log");
+                return;
+            }
+            case (E_exp):
+            {
+                fprintf (fout, "exp");
+                return;
+            }
             default:
                 printf ("NET TAKOGO OPERATORA, ERROR!!!\n");
         }
@@ -510,7 +533,7 @@ node_t* Simplify_Tree (node_t* node)
 
 node_t* Unit (node_t* node)
 {
-    if (node->right)
+    if (node->right)               // functions with 2 arguments
     {
         if ((node->left)->type == E_int && (node->right)->type == E_int)
         {
@@ -615,7 +638,7 @@ node_t* Unit (node_t* node)
             }
         }
     }
-    else
+    else                           // functions with 1 argument
     {
         if (node->type == E_op)
         {
@@ -636,6 +659,16 @@ node_t* Unit (node_t* node)
                     case (E_dif):
                     {
                         node = Case_Differentiation (node);
+                        break;
+                    }
+                    case (E_log):
+                    {
+                        node->data = (int) floor (C_accuracy * log ((node->left)->data / C_accuracy));
+                        break;
+                    }
+                    case (E_exp):
+                    {
+                        node->data = (int) floor (C_accuracy * exp ((node->left)->data / C_accuracy));
                         break;
                     }
                     default:
@@ -732,10 +765,10 @@ node_t* Unit_Differentiation (node_t* node)
 
                 res->left = CN(E_mult, E_op);
                 (res->left)->left  = UD(NL);
-                (res->left)->right = NR;
+                CPY((res->left)->right, NR)
 
                 res->right = CN(E_mult, E_op);
-                (res->right)->left  = NL;
+                CPY((res->right)->left, NL)
                 (res->right)->right = UD(NR);
 
                 return res;
@@ -746,7 +779,7 @@ node_t* Unit_Differentiation (node_t* node)
                 node_t* res = CN(E_div, E_op);
 
                 res->right = CN(E_pow, E_op);
-                (res->right)->left  = NR;
+                CPY((res->right)->left, NR)
                 (res->right)->right = CN(2 * C_accuracy, E_int);
 
 
@@ -754,10 +787,10 @@ node_t* Unit_Differentiation (node_t* node)
 
                 (res->left)->left = CN(E_mult, E_op);     //}
                 ((res->left)->left)->left  = UD(NL);      //|
-                ((res->left)->left)->right = NR;          //|
+                CPY(((res->left)->left)->right, NR)       //|
                                                           //|  mult, when res = res->left
                 (res->left)->right = CN(E_mult, E_op);    //|
-                ((res->left)->right)->left  = NL;         //|
+                CPY(((res->left)->right)->left, NL)       //|
                 ((res->left)->right)->right = UD(NR);     //}
 
                 return res;
@@ -792,12 +825,63 @@ node_t* Unit_Differentiation (node_t* node)
             }
             case (E_pow):
             {
+//                node_t* res = CN(E_dif, E_op);                   }
+//                                                                 |
+//                res->left         = CN(E_exp,  E_op);            |
+//                (res->left)->left = CN(E_mult, E_op);            |
+//                                                                 |
+//                ((res->left)->left)->left = CN(E_log, E_op);     |  with exp
+//                CPY((((res->left)->left)->left)->left, NL)       |
+//                                                                 |
+//                CPY(((res->left)->left)->right, NR)              |
+//                                                                 |
+//                return res;                                      }
 
+                node_t* res = CN(E_mult, E_op);
+
+                res->right = CN(E_pow, E_op);
+                CPY((res->right)->left, NL)
+                CPY((res->right)->right, NR)
+
+                res->left = CN(E_dif, E_op);
+                (res->left)->left = CN(E_mult, E_op);
+
+                ((res->left)->left)->left = CN(E_log, E_op);
+                CPY((((res->left)->left)->left)->left, NL)
+
+                CPY(((res->left)->left)->right, NR)
+
+                return res;
                 break;
             }
             case (E_dif):
             {
                 return Case_Differentiation (node);
+                break;
+            }
+            case (E_log):
+            {
+                node_t* res = CN(E_mult, E_op);
+
+                res->left = CN(E_div, E_op);
+                (res->left)->left  = CN(1 * C_accuracy, E_int);
+                CPY((res->left)->right, NL)
+
+                res->right = CN(E_log, E_op);
+                CPY((res->right)->left, NL)
+
+                return res;
+                break;
+            }
+            case (E_exp):
+            {
+                node_t* res = CN(E_mult, E_op);
+
+                res->left = UD(NL);
+                res->right = CN(E_exp, E_op);
+                CPY((res->right)->left, NL);
+
+                return res;
                 break;
             }
         }

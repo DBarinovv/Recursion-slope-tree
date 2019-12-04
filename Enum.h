@@ -20,4 +20,6 @@ enum operations
     E_cos = 101,
     E_pow = 102,
     E_dif = 103,
+    E_log = 104,
+    E_exp = 105,
 };
