@@ -29,7 +29,7 @@ const int C_max_len = 20;
 
 const int C_max_cnt_of_names = 10;
 
-const int C_accuracy = pow (10, 6);
+const int C_accuracy = pow (10, 4);
 
 char* *G_names = (char **) calloc (C_max_cnt_of_names, sizeof (char *));
 
@@ -40,7 +40,7 @@ const func_t C_functions[] = {
                             {"dif", E_dif}
                              };
 
-const char *C_string = "dif(x*pow(2,5))";
+const char *C_string = "dif(sin(5*x))";
 
 //=============================================================================
 
@@ -82,9 +82,9 @@ void Print_Node_Data_In_Right_Way (node_t* node, FILE *fout);
 
 //=============================================================================
 
-void Simplify_Tree (node_t* node);
+node_t* Simplify_Tree (node_t* node);
 
-void Unit (node_t* node);
+node_t* Unit (node_t* node);
 
 node_t* Case_Differentiation (node_t* node);
 
@@ -98,7 +98,8 @@ int main ()
 
     node_t* node = Get_G ();
 
-    Simplify_Tree (node);
+//    node = Simplify_Tree (node);
+    node = Simplify_Tree (node);
 
     PNG_Dump (node);
 
@@ -486,24 +487,26 @@ void Print_Node_Data_In_Right_Way (node_t* node, FILE *fout)
 
 //=============================================================================
 
-void Simplify_Tree (node_t* node)
+node_t* Simplify_Tree (node_t* node)
 {
     if (node->left && ((node->left)->left || (node->left)->right))
     {
-        Simplify_Tree (node->left);
+        node->left = Simplify_Tree (node->left);
     }
 
     if (node->right && ((node->right)->left || (node->right)->right))
     {
-        Simplify_Tree (node->right);
+        node->right = Simplify_Tree (node->right);
     }
 
-    Unit (node);
+    node = Unit (node);
+
+    return node;
 }
 
 //-----------------------------------------------------------------------------
 
-void Unit (node_t* node)
+node_t* Unit (node_t* node)
 {
     if (node->right)
     {
@@ -550,6 +553,65 @@ void Unit (node_t* node)
                 node->right = nullptr;
             }
         }
+        else
+        {
+            if (node->type == E_op)
+            {
+                if (node->data == E_mult)            // case  *0 || 0*
+                {
+                    if (((node->left)->data == 0 && (node->left)->type  == E_int) ||
+                       ((node->right)->data == 0 && (node->right)->type == E_int))
+                    {
+                        node->data = 0;
+                        node->type = E_int;
+
+                        free (node->left);
+                        node->left = nullptr;
+                        free (node->right);
+                        node->right = nullptr;
+                    }
+                }
+                else if (node->data == E_plus)       // case  +0 || 0+
+                {
+                    if (((node->left)->data == 0 && (node->left)->type == E_int))
+                    {
+                        free (node->left);
+                        node->left = nullptr;
+
+                        node->data = node->right->data;
+                        node->type = node->right->type;
+
+                        free (node->right);
+                        node->right = nullptr;
+                    }
+                    else if (((node->right)->data == 0 && (node->right)->type == E_int))
+                    {
+                        free (node->right);
+                        node->right = nullptr;
+
+                        node->data = node->left->data;
+                        node->type = node->left->type;
+
+                        free (node->left);
+                        node->left = nullptr;
+                    }
+                }
+                else if (node->data == E_minus)      // case  -0
+                {
+                    if (((node->right)->data == 0 && (node->right)->type == E_int))
+                    {
+                        free (node->right);
+                        node->right = nullptr;
+
+                        node->data = node->left->data;
+                        node->type = node->left->type;
+
+                        free (node->left);
+                        node->left = nullptr;
+                    }
+                }
+            }
+        }
     }
     else
     {
@@ -583,8 +645,17 @@ void Unit (node_t* node)
                 free (node->left);
                 node->left = nullptr;
             }
+            else
+            {
+                if (node->data == E_dif)
+                {
+                    node = Case_Differentiation (node);
+                }
+            }
         }
     }
+
+    return node;
 }
 //-----------------------------------------------------------------------------
 
@@ -592,32 +663,142 @@ node_t* Case_Differentiation (node_t* node)
 {
     node_t* res = Unit_Differentiation (node->left);
 
-//    free (node);
-//    node = nullptr;
-
     return res;
 }
 
 //-----------------------------------------------------------------------------
 
+#define CN(data, type)\
+    Create_Node (data, type)
+
+#define UD(node)\
+    Unit_Differentiation (node)
+
+#define NL\
+    node->left
+
+#define NR\
+    node->right
+
+
 node_t* Unit_Differentiation (node_t* node)
 {
     if (node->type == E_int)
     {
-        node->data = 0;
-        return node;
+        return CN(0, E_int);
     }
 
     if (node->type == E_str)
     {
-        node->data = 1;
-        node->type = E_int;
-
-        return node;
+        return CN(1 * C_accuracy, E_int);
     }
 
     if (node->type == E_op)
     {
+        switch (node->data)
+        {
+            case (E_default):
+            {
+                printf ("OSHIBKA PRI INITIALIZATION, ERROR!!!\n");
+                break;
+            }
+            case (E_plus):
+            {
+                node_t* res = CN(E_plus, E_op);
+                res->left  = UD(NL);
+                res->right = UD(NR);
 
+                return res;
+                break;
+            }
+            case (E_minus):
+            {
+                node_t* res = CN(E_minus, E_op);
+                res->left  = UD(NL);
+                res->right = UD(NR);
+
+                return res;
+                break;
+            }
+            case (E_mult):
+            {
+                node_t* res = CN(E_plus, E_op);
+
+                res->left = CN(E_mult, E_op);
+                (res->left)->left  = UD(NL);
+                (res->left)->right = NR;
+
+                res->right = CN(E_mult, E_op);
+                (res->right)->left  = NL;
+                (res->right)->right = UD(NR);
+
+                return res;
+                break;
+            }
+            case (E_div):
+            {
+                node_t* res = CN(E_div, E_op);
+
+                res->right = CN(E_pow, E_op);
+                (res->right)->left  = NR;
+                (res->right)->right = CN(2 * C_accuracy, E_int);
+
+
+                (res->left) = CN(E_minus, E_op);
+
+                (res->left)->left = CN(E_mult, E_op);     //}
+                ((res->left)->left)->left  = UD(NL);      //|
+                ((res->left)->left)->right = NR;          //|
+                                                          //|  mult, when res = res->left
+                (res->left)->right = CN(E_mult, E_op);    //|
+                ((res->left)->right)->left  = NL;         //|
+                ((res->left)->right)->right = UD(NR);     //}
+
+                return res;
+                break;
+            }
+            case (E_sin):
+            {
+                node_t* res = CN(E_mult, E_op);
+
+                res->left = CN(E_cos, E_op);
+                (res->left)->left = NL;
+
+                res->right = UD(NL);
+
+                return res;
+                break;
+            }
+            case (E_cos):
+            {
+                node_t* res = CN(E_mult, E_op);
+
+                res->left = CN(E_mult, E_op);
+                (res->left)->left = CN(E_sin, E_op);
+                ((res->left)->left)->left = NL;
+
+                (res->left)->right = CN(-1 * C_accuracy, E_int);
+
+                res->right = UD(NL);
+
+                return res;
+                break;
+            }
+            case (E_pow):
+            {
+
+                break;
+            }
+            case (E_dif):
+            {
+                return Case_Differentiation (node);
+                break;
+            }
+        }
     }
 }
+
+#undef CN
+#undef UF
+#undef NL
+#undef NR

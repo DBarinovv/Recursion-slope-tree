@@ -9,6 +9,8 @@ enum types
 
 enum operations
 {
+    E_default = 0,
+
     E_plus  = 10,
     E_minus = 11,
     E_mult  = 12,
@@ -16,4 +18,6 @@ enum operations
 
     E_sin = 100,
     E_cos = 101,
+    E_pow = 102,
+    E_dif = 103,
 };
