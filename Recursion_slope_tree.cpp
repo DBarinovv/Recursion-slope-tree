@@ -42,7 +42,7 @@ const func_t C_functions[] = {
                             {"exp", E_exp}
                              };
 
-const char *C_string = "dif(pow(2,x))";
+const char *C_string = "x*(2-1)";
 
 //=============================================================================
 
@@ -582,10 +582,10 @@ node_t* Unit (node_t* node)
         {
             if (node->type == E_op)
             {
-                if (node->data == E_mult)            // case  *0 || 0*
+                if (node->data == E_mult)            // case  *0 || 0* || 1* || *1
                 {
-                    if (((node->left)->data == 0 && (node->left)->type  == E_int) ||
-                       ((node->right)->data == 0 && (node->right)->type == E_int))
+                    if (((node->left)->data == 0 && (node->left)->type  == E_int) ||                   // 0*
+                       ((node->right)->data == 0 && (node->right)->type == E_int))                     // *0
                     {
                         node->data = 0;
                         node->type = E_int;
@@ -594,6 +594,24 @@ node_t* Unit (node_t* node)
                         node->left = nullptr;
                         free (node->right);
                         node->right = nullptr;
+                    }
+                    else if (((node->left)->data == 1 * C_accuracy && (node->left)->type == E_int))    // 1*
+                    {
+                        free (node->left);
+
+                        node->data  = (node->right)->data;
+                        node->type  = (node->right)->type;
+                        node->right = nullptr;
+                        node->left  = nullptr;
+                    }
+                    else if (((node->right)->data == 1 * C_accuracy && (node->right)->type == E_int))  // *1
+                    {
+                        free (node->right);
+
+                        node->data  = (node->left)->data;
+                        node->type  = (node->left)->type;
+                        node->right = nullptr;
+                        node->left  = nullptr;
                     }
                 }
                 else if (node->data == E_plus)       // case  +0 || 0+
