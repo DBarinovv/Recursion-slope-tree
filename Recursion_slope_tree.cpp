@@ -355,16 +355,19 @@ node_t* Case_Functions (const char *str)
                 {
                     printf ("OSHIBKA V INITIALIZATION, ERROR!!!\n");
                 }
+
                 case (E_sin):
                 {
                     node->left = Get_P ();
                     break;
                 }
+
                 case (E_cos):
                 {
                     node->left = Get_P ();
                     break;
                 }
+
                 case (E_pow):
                 {
                     node = Get_P_With_Comma ();
@@ -372,21 +375,25 @@ node_t* Case_Functions (const char *str)
 
                     break;
                 }
+
                 case (E_dif):
                 {
                     node->left = Get_P ();
                     break;
                 }
+
                 case (E_log):
                 {
                     node->left = Get_P ();
                     break;
                 }
+
                 case (E_exp):
                 {
                     node->left = Get_P ();
                     break;
                 }
+
                 default:
                     printf ("NET TAKOY FUNC (Case_Functions), ERROR!!!\n");
             }
@@ -479,51 +486,61 @@ void Print_Node_Data_In_Right_Way (node_t* node, FILE *fout)
                 fprintf (fout, "+");
                 return;
             }
+
             case (E_minus):
             {
                 fprintf (fout, "-");
                 return;
             }
+
             case (E_mult):
             {
                 fprintf (fout, "*");
                 return;
             }
+
             case (E_div):
             {
                 fprintf (fout, "/");
                 return;
             }
+
             case (E_sin):
             {
                 fprintf (fout, "sin");
                 return;
             }
+
             case (E_cos):
             {
                 fprintf (fout, "cos");
                 return;
             }
+
             case (E_pow):
             {
                 fprintf (fout, "pow");
                 return;
             }
+
             case (E_dif):
             {
                 fprintf (fout, "dif");
                 return;
             }
+
             case (E_log):
             {
                 fprintf (fout, "log");
                 return;
             }
+
             case (E_exp):
             {
                 fprintf (fout, "exp");
                 return;
             }
+
             default:
                 printf ("NET TAKOGO OPERATORA, ERROR!!!\n");
         }
@@ -585,26 +602,31 @@ void Unit_For_Oper_With_Two_Arg (node_t* node)
                 node->data = (node->left)->data + (node->right)->data;
                 break;
             }
+
             case (E_minus):
             {
                 node->data = (node->left)->data - (node->right)->data;
                 break;
             }
+
             case (E_mult):
             {
                 node->data = (node->left)->data * (node->right)->data / C_accuracy;
                 break;
             }
+
             case (E_div):
             {
                 node->data = (node->left)->data / (node->right)->data * C_accuracy;
                 break;
             }
+
             case (E_pow):
             {
                 node->data = (int) floor (C_accuracy * pow ((node->left)->data / C_accuracy, (node->right)->data / C_accuracy));
                 break;
             }
+
             default:
                 printf ("POKA CHTO NE PRIDUMAL, ERROR!!!\n");
         }
@@ -708,26 +730,31 @@ void Unit_For_Oper_With_One_Arg (node_t* node)
                 node->data = (int) floor (C_accuracy * sin ((node->left)->data / C_accuracy));
                 break;
             }
+
             case (E_cos):
             {
                 node->data = (int) floor (C_accuracy * cos ((node->left)->data / C_accuracy));
                 break;
             }
+
             case (E_dif):
             {
                 node = Case_Differentiation (node);
                 break;
             }
+
             case (E_log):
             {
                 node->data = (int) floor (C_accuracy * log ((node->left)->data / C_accuracy));
                 break;
             }
+
             case (E_exp):
             {
                 node->data = (int) floor (C_accuracy * exp ((node->left)->data / C_accuracy));
                 break;
             }
+
             default:
                 printf ("NET TAKOY FUNC (Unit), ERROR!!!\n");
         }
@@ -795,6 +822,7 @@ node_t* Unit_Differentiation (node_t* node)
                 printf ("OSHIBKA PRI INITIALIZATION, ERROR!!!\n");
                 break;
             }
+
             case (E_plus):
             {
                 node_t* res = CN(E_plus, E_op);
@@ -804,6 +832,7 @@ node_t* Unit_Differentiation (node_t* node)
                 return res;
                 break;
             }
+
             case (E_minus):
             {
                 node_t* res = CN(E_minus, E_op);
@@ -813,6 +842,7 @@ node_t* Unit_Differentiation (node_t* node)
                 return res;
                 break;
             }
+
             case (E_mult):
             {
                 node_t* res = CN(E_plus, E_op);
@@ -828,6 +858,7 @@ node_t* Unit_Differentiation (node_t* node)
                 return res;
                 break;
             }
+
             case (E_div):
             {
                 node_t* res = CN(E_div, E_op);
@@ -850,6 +881,7 @@ node_t* Unit_Differentiation (node_t* node)
                 return res;
                 break;
             }
+
             case (E_sin):
             {
                 node_t* res = CN(E_mult, E_op);
@@ -862,6 +894,7 @@ node_t* Unit_Differentiation (node_t* node)
                 return res;
                 break;
             }
+
             case (E_cos):
             {
                 node_t* res = CN(E_mult, E_op);
@@ -877,6 +910,7 @@ node_t* Unit_Differentiation (node_t* node)
                 return res;
                 break;
             }
+
             case (E_pow):
             {
 //                node_t* res = CN(E_dif, E_op);                   }
@@ -908,11 +942,13 @@ node_t* Unit_Differentiation (node_t* node)
                 return res;
                 break;
             }
+
             case (E_dif):
             {
                 return Case_Differentiation (node);
                 break;
             }
+
             case (E_log):
             {
                 node_t* res = CN(E_mult, E_op);
@@ -927,6 +963,7 @@ node_t* Unit_Differentiation (node_t* node)
                 return res;
                 break;
             }
+
             case (E_exp):
             {
                 node_t* res = CN(E_mult, E_op);
@@ -938,6 +975,9 @@ node_t* Unit_Differentiation (node_t* node)
                 return res;
                 break;
             }
+
+            default:
+                printf ("NET TAKOY FUNC, ERROR!!!\n");
         }
     }
 }
