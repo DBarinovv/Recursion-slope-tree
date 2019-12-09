@@ -5,6 +5,7 @@ enum types
     E_int  = 1,
     E_str  = 2,
     E_op   = 3,
+    E_line = 4,
 };
 
 enum operations
@@ -15,6 +16,8 @@ enum operations
     E_minus = 11,
     E_mult  = 12,
     E_div   = 13,
+
+    E_equal = 20,
 
     E_sin = 100,
     E_cos = 101,

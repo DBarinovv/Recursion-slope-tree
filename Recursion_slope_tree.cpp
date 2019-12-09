@@ -29,9 +29,19 @@ struct node_t
     node_t* right;
 };
 
+//-----------------------------------------------------------------------------
+
+struct names_t
+{
+    char *name;
+    int mean;
+};
+
 //=============================================================================
 //                          GLOBAL/CONST VARIABLES                            ;
 //=============================================================================
+
+const int C_poison = -179179;
 
 const int C_max_len = 20;
 
@@ -39,7 +49,7 @@ const int C_max_cnt_of_names = 10;
 
 const int C_accuracy = pow (10, 3);
 
-char* *G_names = (char **) calloc (C_max_cnt_of_names, sizeof (char *));
+names_t* G_names = nullptr;
 
 const func_t C_functions[] = {
                             {"sin", E_sin},
@@ -50,7 +60,7 @@ const func_t C_functions[] = {
                             {"exp", E_exp}
                              };
 
-const char *C_string = "x*(2-1)";
+const char *C_string = "x=5\n5+x\n2+3+5\ncos(x)";
 
 //=============================================================================
 //                              RECURSION SLOPE                               ;
@@ -62,6 +72,8 @@ node_t* Create_Node (const int data, const int type);
 
 node_t* Get_G ();
 
+node_t* Get_Line ();
+
 node_t* Get_E ();
 
 node_t* Get_T ();
@@ -69,6 +81,8 @@ node_t* Get_T ();
 node_t* Get_P ();
 
 node_t* Get_Id ();
+
+node_t* Get_Assn (const int pos_of_arg);
 
 node_t* Get_N ();
 
@@ -102,9 +116,9 @@ node_t* Simplify_Tree (node_t* node);
 
 node_t* Unit (node_t* node);
 
-void Unit_For_Oper_With_Two_Arg (node_t* node);
+void Unit_Oper_With_Two_Args    (node_t* node);
 
-void Unit_For_One_And_Zero (node_t* node);
+bool Unit_For_One_And_Zero      (node_t* node);
 
 void Unit_For_Oper_With_One_Arg (node_t* node);
 
@@ -118,13 +132,20 @@ node_t* Unit_Copy (node_t* node_res, node_t* node_cpy);
 
 int main ()
 {
-    for (int i = 0; i < C_max_cnt_of_names; i++) G_names[i] = "";
+    G_names = (names_t *) calloc (C_max_cnt_of_names, sizeof (names_t *));
+
+    for (int i = 0; i < C_max_cnt_of_names; i++)
+    {
+        G_names[i].name = (char *) calloc (C_max_len, sizeof (char));
+        G_names[i].name = "";
+        G_names[i].mean = C_poison;
+    }
 
     node_t* node = Get_G ();
 
-    node = Simplify_Tree (node);
-    node = Simplify_Tree (node);
-    node = Simplify_Tree (node);
+//    node = Simplify_Tree (node);
+//    node = Simplify_Tree (node);
+//    node = Simplify_Tree (node);
 
     PNG_Dump (node);
 
@@ -139,12 +160,12 @@ node_t* Create_Node (const int data, const int type)
 {
     node_t* node = (node_t *) calloc (1, sizeof (node_t) + 2);
 
-    node -> data = data;
-    node -> type = type;
-    node -> left  = nullptr;
-    node -> right = nullptr;
+    node->data  = data;
+    node->type  = type;
+    node->left  = nullptr;
+    node->right = nullptr;
 
-    if (node == nullptr)  Syntax_Error ("Create_Node nullptr");
+    if (node == nullptr)  Syntax_Error ("Create_Node nullptr\n");
 
     return node;
 }
@@ -153,7 +174,7 @@ node_t* Create_Node (const int data, const int type)
 
 node_t* Get_G ()
 {
-    node_t* res = Get_E ();
+    node_t* res = Get_Line ();
 
     if (*C_string == '\0')
         return res;
@@ -163,6 +184,32 @@ node_t* Get_G ()
     }
 
     return nullptr;
+}
+
+//-----------------------------------------------------------------------------
+
+node_t* Get_Line ()
+{
+    int n_line = 1;
+
+    node_t* res = Create_Node (n_line++, E_line);
+
+    node_t* node = res;
+    node->left = Get_E ();
+
+    while (*C_string == '\n')
+    {
+        C_string++;
+
+        node_t* new_res = Create_Node (n_line++, E_line);
+
+        new_res->left = Get_E ();
+        node->right = new_res;
+
+        node = new_res;
+    }
+
+    return res;
 }
 
 //-----------------------------------------------------------------------------
@@ -231,11 +278,16 @@ node_t* Get_P ()
             C_string++;
             return helper;
         }
-        else Syntax_Error ("Get_P");
+        else Syntax_Error ("Get_P\n");
     }
     else if ('a' <= *C_string && *C_string <= 'z')
     {
-        return Get_Id ();
+        node_t* res = Get_Id ();
+
+        node_t* node = Get_Assn (res->data);
+        if (node != nullptr) return node;
+
+        return res;
     }
     else
     {
@@ -259,22 +311,53 @@ node_t* Get_Id ()
         C_string++;
     }
 
-    node_t* node = Case_Functions (helper);
+    node_t* node = nullptr;
+
+    node = Case_Functions (helper);
     if (node != nullptr) return node;
 
     static int cnt = 0;
 
     for (int i = 0; i < C_max_cnt_of_names; i++)
     {
-        if (strcmp (G_names[i], helper) == 0)
+        if (strcmp (G_names[i].name, helper) == 0)
         {
             return Create_Node (i, E_str);
         }
     }
 
-    G_names[cnt++] = helper;
+    G_names[cnt++].name = helper;
 
     return Create_Node (cnt - 1, E_str);
+}
+
+//-----------------------------------------------------------------------------
+
+node_t* Get_Assn (const int pos_of_arg)
+{
+    node_t* res = nullptr;
+
+    if (*C_string == '=')
+    {
+        C_string++;
+
+        res = Create_Node (E_equal, E_op);
+
+        res->left = Create_Node (pos_of_arg, E_str);
+
+        if ('a' <= *C_string && *C_string <= 'z')
+        {
+            res->right = Get_Id ();
+            G_names[pos_of_arg].mean = G_names[(res->right)->data].mean;
+        }
+        else
+        {
+            res->right = Get_N ();
+            G_names[pos_of_arg].mean = (res->right)->data;
+        }
+    }
+
+    return res;
 }
 
 //-----------------------------------------------------------------------------
@@ -313,7 +396,7 @@ node_t* Get_P_With_Comma ()
 
             if (*C_string != ')')
             {
-                Syntax_Error ("Get_P_With_Comma have no ')'");
+                Syntax_Error ("Get_P_With_Comma have no ')'\n");
                 return false;
             }
 
@@ -325,9 +408,9 @@ node_t* Get_P_With_Comma ()
 
             return node;
         }
-        else Syntax_Error ("Get_P_With_Comma have no ','");
+        else Syntax_Error ("Get_P_With_Comma have no ','\n");
     }
-    else Syntax_Error ("Get_P_With_Comma have no '('");
+    else Syntax_Error ("Get_P_With_Comma have no '('\n");
 
     return nullptr;
 }
@@ -477,6 +560,10 @@ void Print_Node_Data_In_Right_Way (node_t* node, FILE *fout)
     {
         fprintf (fout, "%s", G_names[node->data]);
     }
+    else if (node->type == E_line)
+    {
+        fprintf (fout, "%d", node->data);
+    }
     else if (node->type == E_op)
     {
         switch (node->data)
@@ -502,6 +589,12 @@ void Print_Node_Data_In_Right_Way (node_t* node, FILE *fout)
             case (E_div):
             {
                 fprintf (fout, "/");
+                return;
+            }
+
+            case (E_equal):
+            {
+                fprintf (fout, "=");
                 return;
             }
 
@@ -561,7 +654,7 @@ node_t* Simplify_Tree (node_t* node)
         node->right = Simplify_Tree (node->right);
     }
 
-    node = Unit (node);
+    if (node->type != E_line) node = Unit (node);
 
     return node;
 }
@@ -572,14 +665,7 @@ node_t* Unit (node_t* node)
 {
     if (node->right)                // functions with 2 arguments
     {
-        if ((node->left)->type == E_int && (node->right)->type == E_int)
-        {
-            Unit_For_Oper_With_Two_Arg (node);
-        }
-        else if (node->type == E_op)
-        {
-            Unit_For_One_And_Zero (node);
-        }
+        Unit_Oper_With_Two_Args (node);
     }
     else if (node->type == E_op)    // functions with 1 argument
     {
@@ -591,44 +677,78 @@ node_t* Unit (node_t* node)
 
 //-----------------------------------------------------------------------------
 
-void Unit_For_Oper_With_Two_Arg (node_t* node)
+void Unit_Oper_With_Two_Args (node_t* node) //$
 {
-    if (node->type == E_op)
+    if (Unit_For_One_And_Zero (node)) return;
+
+    if (node->type == E_op && node->data == E_equal)
+    {
+        return;
+    }
+
+    int left  = C_poison;
+    int right = C_poison;
+
+    if ((node->left)->type == E_str && G_names[(node->left)->data].mean != C_poison)
+    {
+        left = G_names[(node->left)->data].mean;
+    }
+    else if ((node->left)->type == E_int)
+    {
+        left = (node->left)->data;
+    }
+
+    if ((node->right)->type == E_str && G_names[(node->right)->data].mean != C_poison)
+    {
+        right = G_names[(node->right)->data].mean;
+    }
+    else if ((node->right)->type == E_int)
+    {
+        right = (node->right)->data;
+    }
+
+    if (left != C_poison && right != C_poison)
     {
         switch (node->data)
         {
+            case (E_default):
+            {
+                printf ("OSHIBKA PRI INITIALIZATION, ERROR!!!\n");
+                return;
+            }
+
             case (E_plus):
             {
-                node->data = (node->left)->data + (node->right)->data;
+                node->data = left + right;
                 break;
             }
 
             case (E_minus):
             {
-                node->data = (node->left)->data - (node->right)->data;
+                node->data = left - right;
                 break;
             }
 
             case (E_mult):
             {
-                node->data = (node->left)->data * (node->right)->data / C_accuracy;
+                node->data = left * right / C_accuracy;
                 break;
             }
 
             case (E_div):
             {
-                node->data = (node->left)->data / (node->right)->data * C_accuracy;
+                node->data = left / right * C_accuracy;
                 break;
             }
 
             case (E_pow):
             {
-                node->data = (int) floor (C_accuracy * pow ((node->left)->data / C_accuracy, (node->right)->data / C_accuracy));
+                node->data = (int) floor (C_accuracy * pow (left / C_accuracy, right / C_accuracy));
                 break;
             }
 
             default:
-                printf ("POKA CHTO NE PRIDUMAL, ERROR!!!\n");
+                printf ("CHTO-TO NE TAK PRI PERENOSE(\n");
         }
 
         node->type = E_int;
@@ -642,7 +762,7 @@ void Unit_For_Oper_With_Two_Arg (node_t* node)
 
 //-----------------------------------------------------------------------------
 
-void Unit_For_One_And_Zero (node_t* node)
+bool Unit_For_One_And_Zero (node_t* node)
 {
     if (node->data == E_mult)            // case  *0 || 0* || 1* || *1
     {
@@ -656,6 +776,8 @@ void Unit_For_One_And_Zero (node_t* node)
             node->left = nullptr;
             free (node->right);
             node->right = nullptr;
+
+            return true;
         }
         else if (((node->left)->data == 1 * C_accuracy && (node->left)->type == E_int))    // 1*
         {
@@ -665,6 +787,8 @@ void Unit_For_One_And_Zero (node_t* node)
             node->type  = (node->right)->type;
             node->right = nullptr;
             node->left  = nullptr;
+
+            return true;
         }
         else if (((node->right)->data == 1 * C_accuracy && (node->right)->type == E_int))  // *1
         {
@@ -674,6 +798,8 @@ void Unit_For_One_And_Zero (node_t* node)
             node->type  = (node->left)->type;
             node->right = nullptr;
             node->left  = nullptr;
+
+            return true;
         }
     }
     else if (node->data == E_plus)       // case  +0 || 0+
@@ -688,6 +814,8 @@ void Unit_For_One_And_Zero (node_t* node)
 
             free (node->right);
             node->right = nullptr;
+
+            return true;
         }
         else if (((node->right)->data == 0 && (node->right)->type == E_int))
         {
@@ -699,6 +827,8 @@ void Unit_For_One_And_Zero (node_t* node)
 
             free (node->left);
             node->left = nullptr;
+
+            return true;
         }
     }
     else if (node->data == E_minus)      // case  -0
@@ -713,8 +843,12 @@ void Unit_For_One_And_Zero (node_t* node)
 
             free (node->left);
             node->left = nullptr;
+
+            return true;
         }
     }
+
+    return false;
 }
 
 //-----------------------------------------------------------------------------
@@ -830,7 +964,6 @@ node_t* Unit_Differentiation (node_t* node)
                 res->right = UD(NR);
 
                 return res;
-                break;
             }
 
             case (E_minus):
@@ -840,7 +973,6 @@ node_t* Unit_Differentiation (node_t* node)
                 res->right = UD(NR);
 
                 return res;
-                break;
             }
 
             case (E_mult):
@@ -856,7 +988,6 @@ node_t* Unit_Differentiation (node_t* node)
                 (res->right)->right = UD(NR);
 
                 return res;
-                break;
             }
 
             case (E_div):
@@ -879,7 +1010,6 @@ node_t* Unit_Differentiation (node_t* node)
                 ((res->left)->right)->right = UD(NR);     //}
 
                 return res;
-                break;
             }
 
             case (E_sin):
@@ -892,7 +1022,6 @@ node_t* Unit_Differentiation (node_t* node)
                 res->right = UD(NL);
 
                 return res;
-                break;
             }
 
             case (E_cos):
@@ -908,7 +1037,6 @@ node_t* Unit_Differentiation (node_t* node)
                 res->right = UD(NL);
 
                 return res;
-                break;
             }
 
             case (E_pow):
@@ -940,13 +1068,11 @@ node_t* Unit_Differentiation (node_t* node)
                 CPY(((res->left)->left)->right, NR)
 
                 return res;
-                break;
             }
 
             case (E_dif):
             {
                 return Case_Differentiation (node);
-                break;
             }
 
             case (E_log):
@@ -961,7 +1087,6 @@ node_t* Unit_Differentiation (node_t* node)
                 CPY((res->right)->left, NL)
 
                 return res;
-                break;
             }
 
             case (E_exp):
@@ -973,13 +1098,14 @@ node_t* Unit_Differentiation (node_t* node)
                 CPY((res->right)->left, NL);
 
                 return res;
-                break;
             }
 
             default:
                 printf ("NET TAKOY FUNC, ERROR!!!\n");
         }
     }
+
+    return nullptr;
 }
 
 #undef CN
