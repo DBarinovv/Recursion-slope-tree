@@ -5,7 +5,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <math.h>
+#include <sys/stat.h>
 
 #include "Enum.h"
 
@@ -60,7 +62,17 @@ const func_t C_functions[] = {
                             {"exp", E_exp}
                              };
 
-const char *C_string = "x=5\n5+x\n2+3+5\ncos(x)";
+char *G_code = nullptr;
+
+//=============================================================================
+//                              HELPER FUNCTIONS                              ;
+//=============================================================================
+
+int Find_Sz_File (const char *fin);
+
+bool Initialization ();
+
+void Make_Right_Array (const char *helper, const int sz_file);
 
 //=============================================================================
 //                              RECURSION SLOPE                               ;
@@ -132,14 +144,7 @@ node_t* Unit_Copy (node_t* node_res, node_t* node_cpy);
 
 int main ()
 {
-    G_names = (names_t *) calloc (C_max_cnt_of_names, sizeof (names_t *));
-
-    for (int i = 0; i < C_max_cnt_of_names; i++)
-    {
-        G_names[i].name = (char *) calloc (C_max_len, sizeof (char));
-        G_names[i].name = "";
-        G_names[i].mean = C_poison;
-    }
+    Initialization ();
 
     node_t* node = Get_G ();
 
@@ -152,6 +157,81 @@ int main ()
     printf ("END!\n");
 
     return 0;
+}
+
+//=============================================================================
+
+int Find_Sz_File (const char *fin)
+{
+    struct stat text = {};
+
+    stat (fin, &text);
+
+    return text.st_size;
+}
+
+//-----------------------------------------------------------------------------
+
+bool Initialization ()
+{
+    G_names = (names_t *) calloc (C_max_cnt_of_names, sizeof (names_t *));
+
+    for (int i = 0; i < C_max_cnt_of_names; i++)
+    {
+        G_names[i].name = (char *) calloc (C_max_len, sizeof (char));
+        G_names[i].name = "";
+        G_names[i].mean = C_poison;
+    }
+
+
+    const char *name_of_file = "input.txt";
+
+    int sz_file = Find_Sz_File (name_of_file);
+    FILE* fin = fopen (name_of_file, "r");
+
+    if (fin == nullptr) return false;
+
+    G_code = (char *) calloc (sz_file + 2, sizeof (char));
+
+    char *helper = (char *) calloc (sz_file + 2, sizeof (char));
+    fread (helper, sizeof (char), sz_file, fin);
+
+    Make_Right_Array (helper, sz_file);
+
+    return true;
+}
+
+//-----------------------------------------------------------------------------
+
+void Make_Right_Array (const char *helper, const int sz_file)
+{
+    int pos = 0;
+    int cnt_of_not_space = 0;
+    for (int i = 0; i < sz_file; i++)
+    {
+        if (helper[i] == EOF || (helper[i] == '\0' && i < sz_file))
+        {
+            ;
+        }
+        else if (!isspace (helper[i]))
+        {
+            G_code[pos++] = helper[i];
+            cnt_of_not_space++;
+        }
+        else if (helper[i] == '\n')
+        {
+            if (cnt_of_not_space == 0)
+            {
+                G_code[pos++] = '$';
+            }
+            else
+            {
+                G_code[pos++] = helper[i];
+            }
+
+            cnt_of_not_space = 0;
+        }
+    }
 }
 
 //=============================================================================
@@ -176,7 +256,7 @@ node_t* Get_G ()
 {
     node_t* res = Get_Line ();
 
-    if (*C_string == '\0')
+    if (*G_code == '\0')
         return res;
     else
     {
@@ -197,16 +277,39 @@ node_t* Get_Line ()
     node_t* node = res;
     node->left = Get_E ();
 
-    while (*C_string == '\n')
+    while (*G_code == '\n' || *G_code == '$')
     {
-        C_string++;
+        if  (*G_code == '$')
+        {
+            while (*G_code == '$')
+            {
+                n_line++;
+                G_code++;
+            }
+        }
+        else
+        {
+            G_code++;
 
-        node_t* new_res = Create_Node (n_line++, E_line);
+            if  (*G_code == '$')
+            {
+                while (*G_code == '$')
+                {
+                    n_line++;
+                    G_code++;
+                }
+            }
 
-        new_res->left = Get_E ();
-        node->right = new_res;
+            if (*G_code != '\0' && *G_code != EOF)
+            {
+                node_t* new_res = Create_Node (n_line++, E_line);
 
-        node = new_res;
+                new_res->left = Get_E ();
+                node->right = new_res;
+
+                node = new_res;
+            }
+        }
     }
 
     return res;
@@ -219,10 +322,11 @@ node_t* Get_E ()
     node_t* node1 = Get_T ();
     node_t* new_res = nullptr;
 
-    while (*C_string == '+' || *C_string == '-')
+    while (*G_code == '+' || *G_code == '-')
     {
-        char op = *C_string;
-        C_string++;
+        char op = *G_code;
+
+        G_code++;
 
         node_t* node2 = Get_T ();
 
@@ -244,10 +348,10 @@ node_t* Get_T ()
 {
     node_t* node1 = Get_P ();
 
-    while (*C_string == '*' || *C_string == '/')
+    while (*G_code == '*' || *G_code == '/')
     {
-        char op = *C_string;
-        C_string++;
+        char op = *G_code;
+        G_code++;
 
         node_t* node2 = Get_P ();
         node_t* new_res = nullptr;
@@ -268,19 +372,19 @@ node_t* Get_T ()
 
 node_t* Get_P ()
 {
-    if (*C_string == '(')
+    if (*G_code == '(')
     {
-        C_string++;
+        G_code++;
         node_t* helper = Get_E ();
 
-        if (*C_string == ')')
+        if (*G_code == ')')
         {
-            C_string++;
+            G_code++;
             return helper;
         }
         else Syntax_Error ("Get_P\n");
     }
-    else if ('a' <= *C_string && *C_string <= 'z')
+    else if ('a' <= *G_code && *G_code <= 'z')
     {
         node_t* res = Get_Id ();
 
@@ -302,13 +406,13 @@ node_t* Get_Id ()
     char *helper = (char *) calloc (C_max_len, sizeof (char));
 
     int pos = 0;
-    helper[pos++] = *C_string;
-    C_string++;
+    helper[pos++] = *G_code;
+    G_code++;
 
-    while ('a' <= *C_string && *C_string <= 'z')
+    while ('a' <= *G_code && *G_code <= 'z')
     {
-        helper[pos++] = *C_string;
-        C_string++;
+        helper[pos++] = *G_code;
+        G_code++;
     }
 
     node_t* node = nullptr;
@@ -337,22 +441,51 @@ node_t* Get_Assn (const int pos_of_arg)
 {
     node_t* res = nullptr;
 
-    if (*C_string == '=')
+    if (*G_code == '=')
     {
-        C_string++;
+        G_code++;
 
         res = Create_Node (E_equal, E_op);
 
         res->left = Create_Node (pos_of_arg, E_str);
 
-        if ('a' <= *C_string && *C_string <= 'z')
+        if ('a' <= *G_code && *G_code <= 'z')
         {
-            res->right = Get_Id ();
-            G_names[pos_of_arg].mean = G_names[(res->right)->data].mean;
+            char *helper = G_code;
+            char *argument = (char *) calloc (C_max_len, sizeof (char));
+
+            int pos = 0;
+            while ('a' <= *G_code && *G_code <= 'z')
+            {
+                argument[pos++] = *G_code;
+                G_code++;
+            }
+
+            bool ok = true;
+            for (int i = 0; i < sizeof (C_functions) / sizeof (C_functions[0]); i++)
+            {
+                if (strcmp (C_functions[i].name, argument) == 0)
+                {
+                    ok = false;
+                    break;
+                }
+            }
+
+            G_code = helper;
+
+            if (ok)
+            {
+                res->right = Get_Id ();
+                G_names[pos_of_arg].mean = G_names[(res->right)->data].mean;
+            }
+            else
+            {
+                res->right = Get_E ();
+            }
         }
         else
         {
-            res->right = Get_N ();
+            res->right = Get_E ();
             G_names[pos_of_arg].mean = (res->right)->data;
         }
     }
@@ -366,13 +499,14 @@ node_t* Get_N ()
 {
     int val = 0;
 
-    val = val * 10 + (*C_string - '0');
-    C_string++;
+    val = val * 10 + (*G_code - '0');
 
-    while ('0' <= *C_string && *C_string <= '9')
+    G_code++;
+
+    while ('0' <= *G_code && *G_code <= '9')
     {
-        val = val * 10 + (*C_string - '0');
-        C_string++;
+        val = val * 10 + (*G_code - '0');
+        G_code++;
     }
 
     val *= C_accuracy;
@@ -384,23 +518,23 @@ node_t* Get_N ()
 
 node_t* Get_P_With_Comma ()
 {
-    if (*C_string == '(')
+    if (*G_code == '(')
     {
-        C_string++;
+        G_code++;
         node_t* node1 = Get_E ();
 
-        if (*C_string == ',')
+        if (*G_code == ',')
         {
-            C_string++;
+            G_code++;
             node_t* node2 = Get_E ();
 
-            if (*C_string != ')')
+            if (*G_code != ')')
             {
                 Syntax_Error ("Get_P_With_Comma have no ')'\n");
                 return false;
             }
 
-            C_string++;
+            G_code++;
 
             node_t* node = Create_Node (E_default, E_op);
             node->left  = node1;
@@ -558,11 +692,11 @@ void Print_Node_Data_In_Right_Way (node_t* node, FILE *fout)
     }
     else if (node->type == E_str)
     {
-        fprintf (fout, "%s", G_names[node->data]);
+        fprintf (fout, "%s", G_names[node->data].name);
     }
     else if (node->type == E_line)
     {
-        fprintf (fout, "%d", node->data);
+        fprintf (fout, "LINE = [%d]", node->data);
     }
     else if (node->type == E_op)
     {
@@ -677,7 +811,7 @@ node_t* Unit (node_t* node)
 
 //-----------------------------------------------------------------------------
 
-void Unit_Oper_With_Two_Args (node_t* node) //$
+void Unit_Oper_With_Two_Args (node_t* node)
 {
     if (Unit_For_One_And_Zero (node)) return;
 
