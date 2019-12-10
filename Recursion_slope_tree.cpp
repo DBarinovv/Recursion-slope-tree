@@ -74,6 +74,10 @@ bool Initialization ();
 
 void Make_Right_Array (const char *helper, const int sz_file);
 
+int Make_Op_For_Get_P_With_Key (char chr1, char chr2);
+
+void Dump_Node (node_t* node);
+
 //=============================================================================
 //                              RECURSION SLOPE                               ;
 //=============================================================================
@@ -96,6 +100,8 @@ node_t* Get_Id ();
 
 node_t* Get_Assn (const int pos_of_arg);
 
+node_t* Get_P_With_Key ();
+
 node_t* Get_N ();
 
 node_t* Get_P_With_Comma ();   // for functions with 2 arguments
@@ -107,6 +113,8 @@ void Syntax_Error (const char *name_of_func);
 //-----------------------------------------------------------------------------
 
 node_t* Case_Functions (const char *str);
+
+node_t* Case_Keywords  (const char *str);
 
 //=============================================================================
 //                             PNG DUMP FOR TREE                              ;
@@ -232,6 +240,37 @@ void Make_Right_Array (const char *helper, const int sz_file)
             cnt_of_not_space = 0;
         }
     }
+}
+
+//-----------------------------------------------------------------------------
+
+int Make_Op_For_Get_P_With_Key (char chr1, char chr2)
+{
+    if (chr2 == '=')
+    {
+        G_code++;
+
+        if (chr1 == '<')      return E_jae;
+        else if (chr1 == '>') return E_jbe;
+        else if (chr1 == '!') return E_jne;
+        else if (chr1 == '=') return E_je;
+    }
+    else
+    {
+        if (chr1 == '<') return E_ja;
+
+        return E_jb;
+    }
+}
+
+//-----------------------------------------------------------------------------
+
+void Dump_Node (node_t* node)
+{
+    printf ("NODE->DATA = [%d]\n", node->data);
+    printf ("NODE->TYPE = [%d]\n", node->type);
+    printf ("NODE->LEFT = %p\n", node->left);
+    printf ("NODE->RIGHT = %p\n", node->right);
 }
 
 //=============================================================================
@@ -420,6 +459,13 @@ node_t* Get_Id ()
     node = Case_Functions (helper);
     if (node != nullptr) return node;
 
+    node = Case_Keywords (helper);
+    if (node != nullptr)
+    {
+        node->left = Get_P_With_Key ();
+        return node;
+    }
+
     static int cnt = 0;
 
     for (int i = 0; i < C_max_cnt_of_names; i++)
@@ -441,7 +487,7 @@ node_t* Get_Assn (const int pos_of_arg)
 {
     node_t* res = nullptr;
 
-    if (*G_code == '=')
+    if (*G_code == '=' && *(G_code + 1) != '=')
     {
         G_code++;
 
@@ -491,6 +537,43 @@ node_t* Get_Assn (const int pos_of_arg)
     }
 
     return res;
+}
+
+//-----------------------------------------------------------------------------
+
+node_t* Get_P_With_Key ()
+{
+    if (*G_code == '(')
+    {
+        G_code++;
+        node_t* node1 = Get_E ();
+
+        if (*G_code == '<'  || *G_code == '>'  || *G_code == '=' || *G_code == '!')
+        {
+            int op = Make_Op_For_Get_P_With_Key (*G_code, *(G_code + 1));
+
+            G_code++;
+            node_t* node2 = Get_E ();
+
+            if (*G_code != ')')
+            {
+                Syntax_Error ("Get_P_With_Key have no ')'\n");
+                return false;
+            }
+
+            G_code++;
+
+            node_t* node = Create_Node (op, E_key_op);
+            node->left  = node1;
+            node->right = node2;
+
+            return node;
+        }
+        else Syntax_Error ("Get_P_With_Key have no right oper\n");
+    }
+    else Syntax_Error ("Get_P_With_Key have no '('\n");
+
+    return nullptr;
 }
 
 //-----------------------------------------------------------------------------
@@ -618,6 +701,22 @@ node_t* Case_Functions (const char *str)
             return node;
         }
     }
+
+    return nullptr;
+}
+
+//-----------------------------------------------------------------------------
+
+node_t* Case_Keywords (const char *str)
+{
+    if (strcmp (str, "if") == 0)
+    {
+        return Create_Node (E_if, E_key);
+    }
+//    else if (strcmp (str, "if") == 0)
+//    {
+//        return Create_Node (E_if, E_key);
+//    }
 
     return nullptr;
 }
@@ -772,6 +871,64 @@ void Print_Node_Data_In_Right_Way (node_t* node, FILE *fout)
                 printf ("NET TAKOGO OPERATORA, ERROR!!!\n");
         }
     }
+    else if (node->type == E_key_op)
+    {
+        switch (node->data)
+        {
+            case (E_ja):
+            {
+                fprintf (fout, ">");
+                return;
+            }
+
+            case (E_jb):
+            {
+                fprintf (fout, "<");
+                return;
+            }
+
+            case (E_jae):
+            {
+                fprintf (fout, ">=");
+                return;
+            }
+
+            case (E_jbe):
+            {
+                fprintf (fout, "<=");
+                return;
+            }
+
+            case (E_jne):
+            {
+                fprintf (fout, "!=");
+                return;
+            }
+
+            case (E_je):
+            {
+                fprintf (fout, "==");
+                return;
+            }
+
+            default:
+                printf ("NO E_KEY_OP LIKE THIS!\n");
+        }
+    }
+    else if (node->type == E_key)
+    {
+        switch (node->data)
+        {
+            case (E_if):
+            {
+                fprintf (fout, "if");
+                return;
+            }
+
+            default:
+                printf ("NO E_KEY LIKE THIS!\n");
+        }
+    }
 }
 
 //=============================================================================
@@ -797,6 +954,8 @@ node_t* Simplify_Tree (node_t* node)
 
 node_t* Unit (node_t* node)
 {
+    if (node->type == E_key || node->type == E_key_op) return node;
+
     if (node->right)                // functions with 2 arguments
     {
         Unit_Oper_With_Two_Args (node);

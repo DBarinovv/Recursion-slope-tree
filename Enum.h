@@ -6,6 +6,8 @@ enum types
     E_str  = 2,
     E_op   = 3,
     E_line = 4,
+    E_key  = 5,
+    E_key_op  = 6,
 };
 
 enum operations
@@ -25,4 +27,19 @@ enum operations
     E_dif = 103,
     E_log = 104,
     E_exp = 105,
+};
+
+enum keywords
+{
+    E_if = 150,
+};
+
+enum keywords_opers
+{
+    E_ja  = 200,   // >
+    E_jb  = 201,   // <
+    E_jae = 203,   // >=
+    E_jbe = 204,   // <=
+    E_jne = 205,   // !=
+    E_je  = 206,   // ==
 };
