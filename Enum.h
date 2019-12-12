@@ -8,6 +8,7 @@ enum types
     E_line = 4,
     E_key  = 5,
     E_key_op  = 6,
+    E_label   = 7,  // $
 };
 
 enum operations

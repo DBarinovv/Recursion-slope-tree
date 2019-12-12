@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 
 #include "Enum.h"
+#include "Stack.h"
 
 //=============================================================================
 //                               STRUCTURES                                   ;
@@ -64,6 +65,10 @@ const func_t C_functions[] = {
 
 char *G_code = nullptr;
 
+stack_t* G_labels = nullptr;
+
+int G_cnt_of_labels = 1;
+
 //=============================================================================
 //                              HELPER FUNCTIONS                              ;
 //=============================================================================
@@ -74,7 +79,7 @@ bool Initialization ();
 
 void Make_Right_Array (const char *helper, const int sz_file);
 
-int Make_Op_For_Get_P_With_Key (char chr1, char chr2);
+int Make_Op_For_Get_P_With_Key (const char chr1, const char chr2);
 
 void Dump_Node (node_t* node);
 
@@ -102,6 +107,8 @@ node_t* Get_Assn (const int pos_of_arg);
 
 node_t* Get_P_With_Key ();
 
+node_t* Get_Label ();
+
 node_t* Get_N ();
 
 node_t* Get_P_With_Comma ();   // for functions with 2 arguments
@@ -127,6 +134,16 @@ void Print_PNG_Labels (node_t* node, FILE *fout);
 void Print_PNG        (node_t* node, FILE *fout);
 
 void Print_Node_Data_In_Right_Way (node_t* node, FILE *fout);
+
+//=============================================================================
+//                             ASM DUMP FOR TREE                              ;
+//=============================================================================
+
+void ASM_Dump (node_t* node);
+
+void ASM_Dfs (node_t* node, FILE *fout);
+
+void ASM_Make_Code (node_t* node, FILE *fout);
 
 //=============================================================================
 //                              SIMPLIFY TREE                                 ;
@@ -159,8 +176,9 @@ int main ()
 //    node = Simplify_Tree (node);
 //    node = Simplify_Tree (node);
 //    node = Simplify_Tree (node);
-
     PNG_Dump (node);
+    ASM_Dump (node);
+
 
     printf ("END!\n");
 
@@ -191,10 +209,10 @@ bool Initialization ()
         G_names[i].mean = C_poison;
     }
 
-
     const char *name_of_file = "input.txt";
 
     int sz_file = Find_Sz_File (name_of_file);
+
     FILE* fin = fopen (name_of_file, "r");
 
     if (fin == nullptr) return false;
@@ -205,6 +223,8 @@ bool Initialization ()
     fread (helper, sizeof (char), sz_file, fin);
 
     Make_Right_Array (helper, sz_file);
+
+    STACK_CONSTRUCTOR(G_labels)
 
     return true;
 }
@@ -244,7 +264,7 @@ void Make_Right_Array (const char *helper, const int sz_file)
 
 //-----------------------------------------------------------------------------
 
-int Make_Op_For_Get_P_With_Key (char chr1, char chr2)
+int Make_Op_For_Get_P_With_Key (const char chr1, const char chr2)
 {
     if (chr2 == '=')
     {
@@ -267,10 +287,13 @@ int Make_Op_For_Get_P_With_Key (char chr1, char chr2)
 
 void Dump_Node (node_t* node)
 {
+    printf ("NODE = %p\n", node);
     printf ("NODE->DATA = [%d]\n", node->data);
     printf ("NODE->TYPE = [%d]\n", node->type);
-    printf ("NODE->LEFT = %p\n", node->left);
+    printf ("NODE->LEFT  = %p\n", node->left);
     printf ("NODE->RIGHT = %p\n", node->right);
+
+    printf ("\n");
 }
 
 //=============================================================================
@@ -432,6 +455,10 @@ node_t* Get_P ()
 
         return res;
     }
+    else if (*G_code == ';')
+    {
+        return Get_Label ();
+    }
     else
     {
         return Get_N ();
@@ -558,7 +585,7 @@ node_t* Get_P_With_Key ()
             if (*G_code != ')')
             {
                 Syntax_Error ("Get_P_With_Key have no ')'\n");
-                return false;
+                return nullptr;
             }
 
             G_code++;
@@ -574,6 +601,17 @@ node_t* Get_P_With_Key ()
     else Syntax_Error ("Get_P_With_Key have no '('\n");
 
     return nullptr;
+}
+
+//-----------------------------------------------------------------------------
+
+node_t* Get_Label ()
+{
+    G_code++;
+
+    Stack_Push (G_labels, G_cnt_of_labels);
+
+    return Create_Node (G_cnt_of_labels++, E_label);
 }
 
 //-----------------------------------------------------------------------------
@@ -614,7 +652,7 @@ node_t* Get_P_With_Comma ()
             if (*G_code != ')')
             {
                 Syntax_Error ("Get_P_With_Comma have no ')'\n");
-                return false;
+                return nullptr;
             }
 
             G_code++;
@@ -928,6 +966,302 @@ void Print_Node_Data_In_Right_Way (node_t* node, FILE *fout)
             default:
                 printf ("NO E_KEY LIKE THIS!\n");
         }
+    }
+    else if (node->type == E_label)
+    {
+        fprintf (fout, "$%d", Stack_Top (G_labels));
+        return;
+    }
+}
+
+//=============================================================================
+
+void ASM_Dump (node_t* node)
+{
+    FILE *fout = fopen ("input_for_asm", "w");
+    ASM_Dfs (node, fout);
+
+    fclose (fout);
+}
+
+//-----------------------------------------------------------------------------
+
+void ASM_Dfs (node_t* node, FILE *fout)
+{
+    if (node->type == E_line)
+    {
+        fprintf (fout, "\n");
+    }
+
+    if (node->type == E_op && node->data == E_equal)
+    {
+        if (node->right)
+        {
+            ASM_Dfs (node->right, fout);
+        }
+        else
+        {
+            printf ("NET PRAVOGO DITYA Y '=' ??? WUTFACE\n");
+        }
+
+        switch ((node->left)->data)
+        {
+            case (0):
+            {
+                fprintf (fout, "POP ax\n");
+                return;
+            }
+
+            case (1):
+            {
+                fprintf (fout, "POP bx\n");
+                return;
+            }
+
+            case (2):
+            {
+                fprintf (fout, "POP cx\n");
+                return;
+            }
+
+            case (3):
+            {
+                fprintf (fout, "POP dx\n");
+                return;
+            }
+
+            defualt:
+                printf ("NE XVATAET REGISTROV!\n");
+        }
+
+    }
+    else
+    {
+        if (node->left)
+        {
+            ASM_Dfs (node->left, fout);
+        }
+
+        if (node->right)
+        {
+            ASM_Dfs (node->right, fout);
+        }
+
+        ASM_Make_Code (node, fout);
+    }
+}
+
+//-----------------------------------------------------------------------------
+
+void ASM_Make_Code (node_t* node, FILE *fout)
+{
+    switch (node->type)
+    {
+        case (E_int):
+        {
+            fprintf (fout, "PUSH %d\n", node->data / C_accuracy);
+            return;
+        }
+
+        case (E_str):
+        {
+            switch (node->data)
+            {
+                case (0):
+                {
+                    fprintf (fout, "PUSH ax\n");
+                    return;
+                }
+
+                case (1):
+                {
+                    fprintf (fout, "PUSH bx\n");
+                    return;
+                }
+
+                case (2):
+                {
+                    fprintf (fout, "PUSH cx\n");
+                    return;
+                }
+
+                case (3):
+                {
+                    fprintf (fout, "PUSH dx\n");
+                    return;
+                }
+
+                defualt:
+                    printf ("NET REGISTRA!\n");
+                }
+        }
+
+        case (E_op):
+        {
+            switch (node->data)
+            {
+                case (E_default):
+                {
+                    printf ("DEFAULT???\n");
+                    return;
+                }
+
+                case (E_plus):
+                {
+                    fprintf (fout, "ADD\n");
+                    return;
+                }
+
+                case (E_minus):
+                {
+                    fprintf (fout, "SUB\n");
+                    return;
+                }
+
+                case (E_mult):
+                {
+                    fprintf (fout, "MUL\n");
+                    return;
+                }
+
+                case (E_div):
+                {
+                    fprintf (fout, "DIV\n");
+                    return;
+                }
+
+                case (E_equal):
+                {
+                    fprintf (fout, "=\n");
+                    return;
+                }
+
+                case (E_sin):
+                {
+                    fprintf (fout, "SIN\n");
+                    return;
+                }
+
+                case (E_cos):
+                {
+                    fprintf (fout, "COS\n");
+                    return;
+                }
+
+                case (E_pow):
+                {
+                    fprintf (fout, "POW\n");
+                    return;
+                }
+
+                case (E_dif):
+                {
+                    fprintf (fout, "DIF\n");
+                    return;
+                }
+
+                case (E_log):
+                {
+                    fprintf (fout, "LOG\n");
+                    return;
+                }
+
+                case (E_exp):
+                {
+                    fprintf (fout, "EXP\n");
+                    return;
+                }
+
+                default:
+                    printf ("Make_Code -> ASM\n");
+            }
+        }
+
+        case (E_line):
+        {
+            return;
+        }
+
+        case (E_key):
+        {
+            switch (node->data)
+            {
+                case (E_if):
+                {
+                    fprintf (fout, "IF\n");
+                    return;
+                }
+            }
+        }
+
+        case (E_key_op):
+        {
+            switch (node->data)
+            {
+                case (E_ja):
+                {
+//                    fprintf (fout, "JA $%d\n", Stack_Top (G_labels));
+                    fprintf (fout, "JBE $%d\n", Stack_Top (G_labels));
+                    return;
+                }
+
+                case (E_jb):
+                {
+//                    fprintf (fout, "JB $%d\n", Stack_Top (G_labels));
+                    fprintf (fout, "JAE $%d\n", Stack_Top (G_labels));
+                    return;
+                }
+
+                case (E_jae):
+                {
+//                    fprintf (fout, "JAE $%d\n", Stack_Top (G_labels));
+                    fprintf (fout, "JB $%d\n", Stack_Top (G_labels));
+                    return;
+                }
+
+                case (E_jbe):
+                {
+//                    fprintf (fout, "JBE $%d\n", Stack_Top (G_labels));
+                    fprintf (fout, "JA $%d\n", Stack_Top (G_labels));
+                    return;
+                }
+
+                case (E_jne):
+                {
+//                    fprintf (fout, "JNE $%d\n", Stack_Top (G_labels));
+                    fprintf (fout, "JE $%d\n", Stack_Top (G_labels));
+                    return;
+                }
+
+                case (E_je):
+                {
+//                    fprintf (fout, "JE $%d\n", Stack_Top (G_labels));
+                    fprintf (fout, "JNE $%d\n", Stack_Top (G_labels));
+                    return;
+                }
+            }
+        }
+
+        case (E_label):
+        {
+            int helper = 0;
+
+            if (!Stack_Empty (G_labels))
+            {
+                Stack_Pop (G_labels, &helper);
+            }
+            else
+            {
+                printf ("STACK IS EMPTY!!!\n");
+            }
+
+            fprintf (fout, "$%d\n", helper);
+
+            return;
+        }
+
+        default:
+            printf ("TOP 10 OSHIBOK CHELOVECHESTVA (NEVOZMOZNO:D)\n");
     }
 }
 
