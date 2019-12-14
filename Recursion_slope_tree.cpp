@@ -69,6 +69,8 @@ stack_t* G_labels = nullptr;
 
 int G_cnt_of_labels = 1;
 
+stack_t* G_stack_of_keywords_names = nullptr;
+
 //=============================================================================
 //                              HELPER FUNCTIONS                              ;
 //=============================================================================
@@ -176,6 +178,7 @@ int main ()
 //    node = Simplify_Tree (node);
 //    node = Simplify_Tree (node);
 //    node = Simplify_Tree (node);
+
     PNG_Dump (node);
     ASM_Dump (node);
 
@@ -225,6 +228,7 @@ bool Initialization ()
     Make_Right_Array (helper, sz_file);
 
     STACK_CONSTRUCTOR(G_labels)
+    STACK_CONSTRUCTOR(G_stack_of_keywords_names)
 
     return true;
 }
@@ -457,7 +461,20 @@ node_t* Get_P ()
     }
     else if (*G_code == ';')
     {
-        return Get_Label ();
+        int helper = 0;
+        Stack_Pop (G_stack_of_keywords_names, &helper);
+
+        if (helper == E_if)
+        {
+            return Get_Label ();
+        }
+        else if (helper == E_while)
+        {
+            node_t* node = Create_Node (E_jmp, E_key_op);
+            node->left = Get_Label ();
+
+            return node;
+        }
     }
     else
     {
@@ -489,7 +506,7 @@ node_t* Get_Id ()
     node = Case_Keywords (helper);
     if (node != nullptr)
     {
-        node->left = Get_P_With_Key ();
+
         return node;
     }
 
@@ -749,12 +766,27 @@ node_t* Case_Keywords (const char *str)
 {
     if (strcmp (str, "if") == 0)
     {
-        return Create_Node (E_if, E_key);
+        node_t* node = Create_Node (E_if, E_key);
+        node->left = Get_P_With_Key ();
+
+        Stack_Push (G_stack_of_keywords_names, E_if);
+
+        return node;
     }
-//    else if (strcmp (str, "if") == 0)
-//    {
-//        return Create_Node (E_if, E_key);
-//    }
+    else if (strcmp (str, "while") == 0)
+    {
+        node_t *node = Get_Label ();
+
+        G_code--;   // because of Get_Label
+
+        node->left = Create_Node (E_while, E_key);
+
+        (node->left)->left = Get_P_With_Key ();
+
+        Stack_Push (G_stack_of_keywords_names, E_while);
+
+        return node;
+    }
 
     return nullptr;
 }
@@ -949,6 +981,12 @@ void Print_Node_Data_In_Right_Way (node_t* node, FILE *fout)
                 return;
             }
 
+            case (E_jmp):
+            {
+                fprintf (fout, "JMP");
+                return;
+            }
+
             default:
                 printf ("NO E_KEY_OP LIKE THIS!\n");
         }
@@ -963,13 +1001,19 @@ void Print_Node_Data_In_Right_Way (node_t* node, FILE *fout)
                 return;
             }
 
+            case (E_while):
+            {
+                fprintf (fout, "while");
+                return;
+            }
+
             default:
                 printf ("NO E_KEY LIKE THIS!\n");
         }
     }
     else if (node->type == E_label)
     {
-        fprintf (fout, "$%d", Stack_Top (G_labels));
+        fprintf (fout, "$%d", --G_cnt_of_labels);
         return;
     }
 }
@@ -1191,6 +1235,12 @@ void ASM_Make_Code (node_t* node, FILE *fout)
                     fprintf (fout, "IF\n");
                     return;
                 }
+
+                case (E_while):
+                {
+                    fprintf (fout, "WHILE\n");
+                    return;
+                }
             }
         }
 
@@ -1200,43 +1250,55 @@ void ASM_Make_Code (node_t* node, FILE *fout)
             {
                 case (E_ja):
                 {
-//                    fprintf (fout, "JA $%d\n", Stack_Top (G_labels));
-                    fprintf (fout, "JBE $%d\n", Stack_Top (G_labels));
+////                    fprintf (fout, "JA $%d\n", Stack_Top (G_labels));
+//                    fprintf (fout, "JBE $%d\n", Stack_Top (G_labels));
+                    fprintf (fout, "JBE $%d\n", G_cnt_of_labels++);
                     return;
                 }
 
                 case (E_jb):
                 {
-//                    fprintf (fout, "JB $%d\n", Stack_Top (G_labels));
-                    fprintf (fout, "JAE $%d\n", Stack_Top (G_labels));
+//////                    fprintf (fout, "JB $%d\n", Stack_Top (G_labels));
+////                    fprintf (fout, "JAE $%d\n", Stack_Top (G_labels));
+                    fprintf (fout, "JAE $%d\n", G_cnt_of_labels++);
                     return;
                 }
 
                 case (E_jae):
                 {
-//                    fprintf (fout, "JAE $%d\n", Stack_Top (G_labels));
-                    fprintf (fout, "JB $%d\n", Stack_Top (G_labels));
+////                    fprintf (fout, "JAE $%d\n", Stack_Top (G_labels));
+//                    fprintf (fout, "JB $%d\n", Stack_Top (G_labels));
+                    fprintf (fout, "JB $%d\n", G_cnt_of_labels++);
                     return;
                 }
 
                 case (E_jbe):
                 {
-//                    fprintf (fout, "JBE $%d\n", Stack_Top (G_labels));
-                    fprintf (fout, "JA $%d\n", Stack_Top (G_labels));
+////                    fprintf (fout, "JBE $%d\n", Stack_Top (G_labels));
+//                    fprintf (fout, "JA $%d\n", Stack_Top (G_labels));
+                    fprintf (fout, "JA $%d\n", G_cnt_of_labels++);
                     return;
                 }
 
                 case (E_jne):
                 {
-//                    fprintf (fout, "JNE $%d\n", Stack_Top (G_labels));
-                    fprintf (fout, "JE $%d\n", Stack_Top (G_labels));
+////                    fprintf (fout, "JNE $%d\n", Stack_Top (G_labels));
+//                    fprintf (fout, "JE $%d\n", Stack_Top (G_labels));
+                    fprintf (fout, "JE $%d\n", G_cnt_of_labels++);
                     return;
                 }
 
                 case (E_je):
                 {
-//                    fprintf (fout, "JE $%d\n", Stack_Top (G_labels));
-                    fprintf (fout, "JNE $%d\n", Stack_Top (G_labels));
+////                    fprintf (fout, "JE $%d\n", Stack_Top (G_labels));
+//                    fprintf (fout, "JNE $%d\n", Stack_Top (G_labels));
+                    fprintf (fout, "JNE $%d\n", G_cnt_of_labels++);
+                    return;
+                }
+
+                case (E_jmp):
+                {
+                    fprintf (fout, "JMP $%d\n", G_cnt_of_labels++);
                     return;
                 }
             }

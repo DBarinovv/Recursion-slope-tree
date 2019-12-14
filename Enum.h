@@ -33,6 +33,7 @@ enum operations
 enum keywords
 {
     E_if = 150,
+    E_while = 151,
 };
 
 enum keywords_opers
@@ -43,4 +44,6 @@ enum keywords_opers
     E_jbe = 204,   // <=
     E_jne = 205,   // !=
     E_je  = 206,   // ==
+
+    E_jmp = 207,
 };
