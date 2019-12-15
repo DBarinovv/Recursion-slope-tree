@@ -7,9 +7,9 @@ enum types
     E_op   = 3,
     E_line = 4,
     E_key  = 5,
-    E_key_op  = 6,
-    E_label   = 7,    // $
-    E_call = 8,
+    E_key_op = 6,
+    E_label  = 7,    // $
+    E_call   = 8,
     E_func_label = 9,
 };
 

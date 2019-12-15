@@ -65,9 +65,9 @@ const func_t C_functions[] = {
 
 char *G_code = nullptr;
 
-stack_t* G_labels = nullptr;
-
 int G_cnt_of_labels = 10;
+
+int G_cnt_of_labels_help = 10;
 
 stack_t* G_stack_of_keywords_names = nullptr;
 
@@ -75,7 +75,7 @@ names_t* G_names_of_functions = nullptr;
 
 int G_cnt_of_func_labels = 1;
 
-stack_t* G_func_labels = nullptr;
+int G_cnt_of_func_labels_help = 1;
 
 //=============================================================================
 //                              HELPER FUNCTIONS                              ;
@@ -238,9 +238,7 @@ bool Initialization ()
 
     Make_Right_Array (helper, sz_file);
 
-    STACK_CONSTRUCTOR(G_labels)
     STACK_CONSTRUCTOR(G_stack_of_keywords_names)
-    STACK_CONSTRUCTOR(G_func_labels)
 
     return true;
 }
@@ -647,8 +645,6 @@ node_t* Get_Label ()
 {
     G_code++;
 
-    Stack_Push (G_labels, G_cnt_of_labels);
-
     return Create_Node (G_cnt_of_labels++, E_label);
 }
 
@@ -840,9 +836,7 @@ node_t* Case_Keywords (const char *str)
         }
 
         G_names_of_functions[free].name = helper;
-        G_names_of_functions[free].mean = G_cnt_of_func_labels;
-
-        Stack_Push (G_func_labels, G_cnt_of_func_labels++);
+        G_names_of_functions[free].mean = G_cnt_of_func_labels++;
 
         node_t* node = Create_Node (E_jmp, E_key_op);    // before function jump after (because we do not want to enter)
         node->left = Create_Node (free, E_func_label);   // Label to call function
@@ -1127,10 +1121,7 @@ void ASM_Dfs (node_t* node, FILE *fout)
 
     if (node->type == E_label)
     {
-        int helper = 0;
-        Stack_Pop (G_labels, &helper);
-
-        fprintf (fout, "$%d\n", helper);
+        fprintf (fout, "$%d\n", G_cnt_of_labels_help++); // $
 
         node->data = E_default;
     }
@@ -1439,18 +1430,7 @@ void ASM_Make_Code (node_t* node, FILE *fout)
         {
             if (node->data == E_default) return;
 
-            int helper = 0;
-
-            if (!Stack_Empty (G_labels))
-            {
-                Stack_Pop (G_labels, &helper);
-            }
-            else
-            {
-                printf ("STACK IS EMPTY!!!\n");
-            }
-
-            fprintf (fout, "$%d\n", helper);
+            fprintf (fout, "$%d\n", G_cnt_of_labels_help++); // $
 
             return;
         }
@@ -1463,18 +1443,7 @@ void ASM_Make_Code (node_t* node, FILE *fout)
 
         case (E_func_label):
         {
-            int helper = 0;
-
-            if (!Stack_Empty (G_func_labels))
-            {
-                Stack_Pop (G_func_labels, &helper);
-            }
-            else
-            {
-                printf ("STACK IS EMPTY!!!\n");
-            }
-
-            fprintf (fout, "$%d", helper);
+            fprintf (fout, "$%d", G_cnt_of_func_labels_help++); // $
             return;
         }
 
