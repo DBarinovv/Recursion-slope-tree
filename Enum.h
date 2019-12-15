@@ -8,7 +8,9 @@ enum types
     E_line = 4,
     E_key  = 5,
     E_key_op  = 6,
-    E_label   = 7,  // $
+    E_label   = 7,    // $
+    E_call = 8,
+    E_func_label = 9,
 };
 
 enum operations
@@ -34,6 +36,7 @@ enum keywords
 {
     E_if = 150,
     E_while = 151,
+    E_func = 152,
 };
 
 enum keywords_opers
@@ -45,5 +48,6 @@ enum keywords_opers
     E_jne = 205,   // !=
     E_je  = 206,   // ==
 
-    E_jmp = 207,
+    E_jmp  = 207,
+    E_ret  = 208,
 };

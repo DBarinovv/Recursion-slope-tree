@@ -52,7 +52,7 @@ const int C_max_cnt_of_names = 10;
 
 const int C_accuracy = pow (10, 3);
 
-names_t* G_names = nullptr;
+names_t* G_names_of_variables = nullptr;
 
 const func_t C_functions[] = {
                             {"sin", E_sin},
@@ -67,9 +67,15 @@ char *G_code = nullptr;
 
 stack_t* G_labels = nullptr;
 
-int G_cnt_of_labels = 1;
+int G_cnt_of_labels = 10;
 
 stack_t* G_stack_of_keywords_names = nullptr;
+
+names_t* G_names_of_functions = nullptr;
+
+int G_cnt_of_func_labels = 1;
+
+stack_t* G_func_labels = nullptr;
 
 //=============================================================================
 //                              HELPER FUNCTIONS                              ;
@@ -203,16 +209,21 @@ int Find_Sz_File (const char *fin)
 
 bool Initialization ()
 {
-    G_names = (names_t *) calloc (C_max_cnt_of_names, sizeof (names_t *));
+    G_names_of_variables = (names_t *) calloc (C_max_cnt_of_names, sizeof (names_t *));
+    G_names_of_functions = (names_t *) calloc (C_max_cnt_of_names, sizeof (names_t *));
 
     for (int i = 0; i < C_max_cnt_of_names; i++)
     {
-        G_names[i].name = (char *) calloc (C_max_len, sizeof (char));
-        G_names[i].name = "";
-        G_names[i].mean = C_poison;
+        G_names_of_variables[i].name = (char *) calloc (C_max_len, sizeof (char));
+        G_names_of_variables[i].name = "";
+        G_names_of_variables[i].mean = C_poison;
+
+        G_names_of_functions[i].name = (char *) calloc (C_max_len, sizeof (char));
+        G_names_of_functions[i].name = "";
+        G_names_of_functions[i].mean = C_poison;
     }
 
-    const char *name_of_file = "input.txt";
+    const char name_of_file[] = "input.txt";
 
     int sz_file = Find_Sz_File (name_of_file);
 
@@ -229,6 +240,7 @@ bool Initialization ()
 
     STACK_CONSTRUCTOR(G_labels)
     STACK_CONSTRUCTOR(G_stack_of_keywords_names)
+    STACK_CONSTRUCTOR(G_func_labels)
 
     return true;
 }
@@ -473,6 +485,19 @@ node_t* Get_P ()
             node_t* node = Create_Node (E_jmp, E_key_op);
             node->left = Get_Label ();
 
+//            node_t* node = Get_Label ();
+//            node->left = Create_Node (E_jmp, E_key_op);
+
+            return node;
+        }
+        else if (helper == E_func)
+        {
+            node_t* node = Create_Node (E_ret, E_key_op); // !!! $ may be swap with next line
+            node->left = Get_Label ();
+
+//            node_t* node = Get_Label ();
+//            node->left = Create_Node (E_ret, E_key_op);
+
             return node;
         }
     }
@@ -504,23 +529,19 @@ node_t* Get_Id ()
     if (node != nullptr) return node;
 
     node = Case_Keywords (helper);
-    if (node != nullptr)
-    {
-
-        return node;
-    }
+    if (node != nullptr) return node;
 
     static int cnt = 0;
 
     for (int i = 0; i < C_max_cnt_of_names; i++)
     {
-        if (strcmp (G_names[i].name, helper) == 0)
+        if (strcmp (G_names_of_variables[i].name, helper) == 0)
         {
             return Create_Node (i, E_str);
         }
     }
 
-    G_names[cnt++].name = helper;
+    G_names_of_variables[cnt++].name = helper;
 
     return Create_Node (cnt - 1, E_str);
 }
@@ -563,20 +584,20 @@ node_t* Get_Assn (const int pos_of_arg)
 
             G_code = helper;
 
-            if (ok)
-            {
-                res->right = Get_Id ();
-                G_names[pos_of_arg].mean = G_names[(res->right)->data].mean;
-            }
-            else
-            {
-                res->right = Get_E ();
-            }
+//            if (ok)
+//            {
+//                res->right = Get_Id ();
+//                G_names_of_variables[pos_of_arg].mean = G_names_of_variables[(res->right)->data].mean;
+//            }
+//            else
+//            {
+            res->right = Get_E ();
+//            }
         }
         else
         {
             res->right = Get_E ();
-            G_names[pos_of_arg].mean = (res->right)->data;
+            G_names_of_variables[pos_of_arg].mean = (res->right)->data;
         }
     }
 
@@ -766,15 +787,17 @@ node_t* Case_Keywords (const char *str)
 {
     if (strcmp (str, "if") == 0)
     {
+        Stack_Push (G_stack_of_keywords_names, E_if);
+
         node_t* node = Create_Node (E_if, E_key);
         node->left = Get_P_With_Key ();
-
-        Stack_Push (G_stack_of_keywords_names, E_if);
 
         return node;
     }
     else if (strcmp (str, "while") == 0)
     {
+        Stack_Push (G_stack_of_keywords_names, E_while);
+
         node_t *node = Get_Label ();
 
         G_code--;   // because of Get_Label
@@ -783,7 +806,46 @@ node_t* Case_Keywords (const char *str)
 
         (node->left)->left = Get_P_With_Key ();
 
-        Stack_Push (G_stack_of_keywords_names, E_while);
+        return node;
+    }
+    else if (strcmp (str, "func") == 0)
+    {
+        Stack_Push (G_stack_of_keywords_names, E_func);
+
+        char *helper = (char *) calloc (C_max_len, sizeof (char));
+
+        if (*G_code != '_')
+        {
+            Syntax_Error ("NEED SPACE AFTER 'FUNC' !!!\n");
+        }
+
+        G_code++;
+
+        int pos = 0;
+        while ('a' <= *G_code && *G_code <= 'z')
+        {
+            helper[pos++] = *G_code;
+            G_code++;
+        }
+
+        int free = 0;
+        for (int i = 0; i < C_max_cnt_of_names; i++)
+        {
+            if (strcmp (helper, G_names_of_functions[i].name) == 0)
+            {
+                return Create_Node (G_names_of_functions[i].mean, E_call);   // call function
+            }
+
+            if (strcmp (G_names_of_functions[i].name, "") == 0) free = i;
+        }
+
+        G_names_of_functions[free].name = helper;
+        G_names_of_functions[free].mean = G_cnt_of_func_labels;
+
+        Stack_Push (G_func_labels, G_cnt_of_func_labels++);
+
+        node_t* node = Create_Node (E_jmp, E_key_op);    // before function jump after (because we do not want to enter)
+        node->left = Create_Node (free, E_func_label);   // Label to call function
 
         return node;
     }
@@ -861,7 +923,7 @@ void Print_Node_Data_In_Right_Way (node_t* node, FILE *fout)
     }
     else if (node->type == E_str)
     {
-        fprintf (fout, "%s", G_names[node->data].name);
+        fprintf (fout, "%s", G_names_of_variables[node->data].name);
     }
     else if (node->type == E_line)
     {
@@ -987,8 +1049,18 @@ void Print_Node_Data_In_Right_Way (node_t* node, FILE *fout)
                 return;
             }
 
+            case (E_ret):
+            {
+                fprintf (fout, "RET");
+                return;
+            }
+
             default:
+            {
                 printf ("NO E_KEY_OP LIKE THIS!\n");
+                printf ("NODE->DATA = [%d]\n", node->data);
+
+            }
         }
     }
     else if (node->type == E_key)
@@ -1007,6 +1079,12 @@ void Print_Node_Data_In_Right_Way (node_t* node, FILE *fout)
                 return;
             }
 
+            case (E_func):
+            {
+                fprintf (fout, "func");
+                return;
+            }
+
             default:
                 printf ("NO E_KEY LIKE THIS!\n");
         }
@@ -1014,6 +1092,16 @@ void Print_Node_Data_In_Right_Way (node_t* node, FILE *fout)
     else if (node->type == E_label)
     {
         fprintf (fout, "$%d", --G_cnt_of_labels);
+        return;
+    }
+    else if (node->type == E_call)
+    {
+        fprintf (fout, "CALL");
+        return;
+    }
+    else if (node->type == E_func_label)
+    {
+        fprintf (fout,"$%d", --G_cnt_of_func_labels);
         return;
     }
 }
@@ -1035,6 +1123,30 @@ void ASM_Dfs (node_t* node, FILE *fout)
     if (node->type == E_line)
     {
         fprintf (fout, "\n");
+    }
+
+    if (node->type == E_label)
+    {
+        int helper = 0;
+        Stack_Pop (G_labels, &helper);
+
+        fprintf (fout, "$%d\n", helper);
+
+        node->data = E_default;
+    }
+
+    if (node->type == E_key_op && node->data == E_jmp)
+    {
+        fprintf (fout, "JMP $%d\n", G_cnt_of_labels++);
+
+        node->data = E_default;
+    }
+
+    if (node->type == E_key_op && node->data == E_ret)
+    {
+        fprintf (fout, "RET\n");
+
+        node->data = E_default;
     }
 
     if (node->type == E_op && node->data == E_equal)
@@ -1232,13 +1344,20 @@ void ASM_Make_Code (node_t* node, FILE *fout)
             {
                 case (E_if):
                 {
-                    fprintf (fout, "IF\n");
+//                    fprintf (fout, "IF\n");
                     return;
                 }
 
                 case (E_while):
                 {
-                    fprintf (fout, "WHILE\n");
+//                    fprintf ("")
+//                    fprintf (fout, "WHILE\n");
+                    return;
+                }
+
+                case (E_func):
+                {
+                    fprintf (fout, "FUNC\n");
                     return;
                 }
             }
@@ -1301,11 +1420,25 @@ void ASM_Make_Code (node_t* node, FILE *fout)
                     fprintf (fout, "JMP $%d\n", G_cnt_of_labels++);
                     return;
                 }
+
+                case (E_ret):
+                {
+                    fprintf (fout, "RET\n");
+                    return;
+                }
+
+                case (E_default):
+                {
+                    printf ("TUT!!\n");
+                    return;
+                }
             }
         }
 
         case (E_label):
         {
+            if (node->data == E_default) return;
+
             int helper = 0;
 
             if (!Stack_Empty (G_labels))
@@ -1319,6 +1452,29 @@ void ASM_Make_Code (node_t* node, FILE *fout)
 
             fprintf (fout, "$%d\n", helper);
 
+            return;
+        }
+
+        case (E_call):
+        {
+            fprintf (fout, "CALL $%d\n", node->data);
+            return;
+        }
+
+        case (E_func_label):
+        {
+            int helper = 0;
+
+            if (!Stack_Empty (G_func_labels))
+            {
+                Stack_Pop (G_func_labels, &helper);
+            }
+            else
+            {
+                printf ("STACK IS EMPTY!!!\n");
+            }
+
+            fprintf (fout, "$%d", helper);
             return;
         }
 
@@ -1378,18 +1534,18 @@ void Unit_Oper_With_Two_Args (node_t* node)
     int left  = C_poison;
     int right = C_poison;
 
-    if ((node->left)->type == E_str && G_names[(node->left)->data].mean != C_poison)
+    if ((node->left)->type == E_str && G_names_of_variables[(node->left)->data].mean != C_poison)
     {
-        left = G_names[(node->left)->data].mean;
+        left = G_names_of_variables[(node->left)->data].mean;
     }
     else if ((node->left)->type == E_int)
     {
         left = (node->left)->data;
     }
 
-    if ((node->right)->type == E_str && G_names[(node->right)->data].mean != C_poison)
+    if ((node->right)->type == E_str && G_names_of_variables[(node->right)->data].mean != C_poison)
     {
-        right = G_names[(node->right)->data].mean;
+        right = G_names_of_variables[(node->right)->data].mean;
     }
     else if ((node->right)->type == E_int)
     {
