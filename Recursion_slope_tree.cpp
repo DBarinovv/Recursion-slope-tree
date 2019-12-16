@@ -135,6 +135,14 @@ node_t* Case_Functions (const char *str);
 
 node_t* Case_Keywords  (const char *str);
 
+node_t* Case_Str_Is_Equal_If ();
+
+node_t* Case_Str_Is_Equal_While ();
+
+node_t* Case_Str_Is_Equal_Func ();
+
+node_t* Case_Str_Is_Equal_Print ();
+
 //=============================================================================
 //                             PNG DUMP FOR TREE                              ;
 //=============================================================================
@@ -790,120 +798,148 @@ node_t* Case_Functions (const char *str)
 
 node_t* Case_Keywords (const char *str)
 {
-    if (strcmp (str, "if") == 0)
+    if (strcmp (str, C_keywords_names[E_if_ind]) == 0)
     {
-        Stack_Push (G_stack_of_keywords_names, E_if);
-
-        node_t* node = Create_Node (E_if, E_key);
-        node->left = Get_P_With_Key ();
-
-        return node;
+        return Case_Str_Is_Equal_If ();
     }
-    else if (strcmp (str, "while") == 0)
+    else if (strcmp (str, C_keywords_names[E_while_ind]) == 0)
     {
-        Stack_Push (G_stack_of_keywords_names, E_while);
-
-        node_t *node = Get_Label ();
-
-        G_code--;   // because of Get_Label
-
-        node->left = Create_Node (E_while, E_key);
-
-        (node->left)->left = Get_P_With_Key ();
-
-        return node;
+        return Case_Str_Is_Equal_While ();
     }
-    else if (strcmp (str, "func") == 0)
+    else if (strcmp (str, C_keywords_names[E_func_ind]) == 0)
     {
-        char *helper = (char *) calloc (C_max_len, sizeof (char));
+        return Case_Str_Is_Equal_Func ();
+    }
+    else if (strcmp (str, C_keywords_names[E_ret_ind]) == 0)
+    {
+        return Create_Node (E_ret, E_key_op);
+    }
+    else if (strcmp (str, C_keywords_names[E_start_ind]) == 0)
+    {
+        return Create_Node (0, E_start);
+    }
+    else if (strcmp (str, C_keywords_names[E_print_ind]) == 0)
+    {
+        return Case_Str_Is_Equal_Print ();
+    }
 
-        if (*G_code != '_')
-        {
-            Syntax_Error ("NEED SPACE AFTER 'FUNC' !!!\n");
-        }
+    return nullptr;
+}
 
+//-----------------------------------------------------------------------------
+
+node_t* Case_Str_Is_Equal_If ()
+{
+    Stack_Push (G_stack_of_keywords_names, E_if);
+
+    node_t* node = Create_Node (E_if, E_key);
+    node->left = Get_P_With_Key ();
+
+    return node;
+}
+
+//-----------------------------------------------------------------------------
+
+node_t* Case_Str_Is_Equal_While ()
+{
+    Stack_Push (G_stack_of_keywords_names, E_while);
+
+    node_t *node = Get_Label ();
+
+    G_code--;   // because of Get_Label
+
+    node->left = Create_Node (E_while, E_key);
+
+    (node->left)->left = Get_P_With_Key ();
+
+    return node;
+}
+
+//-----------------------------------------------------------------------------
+
+node_t* Case_Str_Is_Equal_Func ()
+{
+    char *helper = (char *) calloc (C_max_len, sizeof (char));
+
+    if (*G_code != '_')
+    {
+        Syntax_Error ("NEED SPACE AFTER 'FUNC' !!!\n");
+    }
+
+    G_code++;
+
+    int pos = 0;
+    while ('a' <= *G_code && *G_code <= 'z')
+    {
+        helper[pos++] = *G_code;
         G_code++;
+    }
 
-        int pos = 0;
-        while ('a' <= *G_code && *G_code <= 'z')
+    int free = 0;
+    for (int i = 0; i < C_max_cnt_of_names; i++)
+    {
+        if (strcmp (helper, G_names_of_functions[i].name) == 0)
         {
-            helper[pos++] = *G_code;
-            G_code++;
+            return Create_Node (G_names_of_functions[i].mean, E_call);   // call function
         }
 
-        int free = 0;
-        for (int i = 0; i < C_max_cnt_of_names; i++)
-        {
-            if (strcmp (helper, G_names_of_functions[i].name) == 0)
-            {
-                return Create_Node (G_names_of_functions[i].mean, E_call);   // call function
-            }
+        if (strcmp (G_names_of_functions[i].name, "") == 0) free = i;
+    }
 
-            if (strcmp (G_names_of_functions[i].name, "") == 0) free = i;
-        }
-
-        G_names_of_functions[free].name = helper;
-        G_names_of_functions[free].mean = G_cnt_of_func_labels++;
+    G_names_of_functions[free].name = helper;
+    G_names_of_functions[free].mean = G_cnt_of_func_labels++;
 
 //        node_t* node = Create_Node (E_jmp, E_key_op);    // before function jump after (because we do not want to enter)
 //        node->left = Create_Node (free, E_func_label);   // Label to call function
 
-        Stack_Push (G_stack_of_keywords_names, E_func);
+    Stack_Push (G_stack_of_keywords_names, E_func);
 
-        return Create_Node (free, E_func_label);
-    }
-    else if (strcmp (str, "return") == 0)
+    return Create_Node (free, E_func_label);
+}
+
+//-----------------------------------------------------------------------------
+
+node_t* Case_Str_Is_Equal_Print ()
+{
+    char *helper = (char *) calloc (C_max_len, sizeof (char));
+
+    int pos = 0;
+    int cnt_of_out = 0;
+
+    while (*G_code != '!')
     {
-        return Create_Node (E_ret, E_key_op);
-    }
-    else if (strcmp (str, "start") == 0)
-    {
-        return Create_Node (0, E_start);
-    }
-    else if (strcmp (str, "print") == 0)
-    {
-        char *helper = (char *) calloc (C_max_len, sizeof (char));
-
-        int pos = 0;
-        int cnt_of_out = 0;
-
-        while (*G_code != '!')
-        {
-            if (*G_code == '%') cnt_of_out++;
-
-            helper[pos++] = *G_code;
-            G_code++;
-        }
+        if (*G_code == '%') cnt_of_out++;
 
         helper[pos++] = *G_code;
         G_code++;
-
-        printf ("HELPER = (%s)\n", helper);
-
-        G_arr_for_printf[G_free_for_arr_for_printf].name = helper;
-
-        if (cnt_of_out >= 1)
-        {
-            node_t* node = Create_Node (E_out, E_print);
-            node_t* helper_node = node;
-
-            for (int i = 1; i < cnt_of_out; i++)
-            {
-                helper_node->left = Create_Node (E_out, E_print);
-                helper_node = helper_node->left;
-            }
-
-            helper_node->left = Create_Node (G_free_for_arr_for_printf++, E_print);
-
-            return node;
-        }
-        else
-        {
-            return Create_Node (G_free_for_arr_for_printf++, E_print);
-        }
     }
 
-    return nullptr;
+    helper[pos++] = *G_code;
+    G_code++;
+
+    printf ("HELPER = (%s)\n", helper);
+
+    G_arr_for_printf[G_free_for_arr_for_printf].name = helper;
+
+    if (cnt_of_out >= 1)
+    {
+        node_t* node = Create_Node (E_out, E_print);
+        node_t* helper_node = node;
+
+        for (int i = 1; i < cnt_of_out; i++)
+        {
+            helper_node->left = Create_Node (E_out, E_print);
+            helper_node = helper_node->left;
+        }
+
+        helper_node->left = Create_Node (G_free_for_arr_for_printf++, E_print);
+
+        return node;
+    }
+    else
+    {
+        return Create_Node (G_free_for_arr_for_printf++, E_print);
+    }
 }
 
 //=============================================================================

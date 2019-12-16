@@ -57,3 +57,22 @@ enum keywords_opers
 
     E_out = 209
 };
+
+enum keywords_names
+{
+    E_if_ind    = 0,
+    E_while_ind = 1,
+    E_func_ind  = 2,
+    E_ret_ind   = 3,
+    E_start_ind = 4,
+    E_print_ind = 5,
+};
+
+const char *C_keywords_names[] = {
+                            "ba",      // if
+                            "dfqk",    // while
+                            "aeyrwbz", // func
+                            "htnthy",  // return
+                            "cnfhn",   // start
+                            "ghbyn",   // print
+                            };
