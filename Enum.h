@@ -2,6 +2,8 @@
 
 enum types
 {
+    E_start = 0,
+
     E_int  = 1,
     E_str  = 2,
     E_op   = 3,
@@ -11,6 +13,8 @@ enum types
     E_label  = 7,    // $
     E_call   = 8,
     E_func_label = 9,
+
+    E_print = 10,
 };
 
 enum operations
@@ -50,4 +54,6 @@ enum keywords_opers
 
     E_jmp  = 207,
     E_ret  = 208,
+
+    E_out = 209
 };

@@ -46,7 +46,7 @@ struct names_t
 
 const int C_poison = -179179;
 
-const int C_max_len = 20;
+const int C_max_len = 40;
 
 const int C_max_cnt_of_names = 10;
 
@@ -76,6 +76,10 @@ names_t* G_names_of_functions = nullptr;
 int G_cnt_of_func_labels = 1;
 
 int G_cnt_of_func_labels_help = 1;
+
+names_t* G_arr_for_printf = nullptr;
+
+int G_free_for_arr_for_printf = 0;
 
 //=============================================================================
 //                              HELPER FUNCTIONS                              ;
@@ -211,6 +215,7 @@ bool Initialization ()
 {
     G_names_of_variables = (names_t *) calloc (C_max_cnt_of_names, sizeof (names_t *));
     G_names_of_functions = (names_t *) calloc (C_max_cnt_of_names, sizeof (names_t *));
+    G_arr_for_printf     = (names_t *) calloc (C_max_cnt_of_names, sizeof (names_t *));
 
     for (int i = 0; i < C_max_cnt_of_names; i++)
     {
@@ -221,6 +226,10 @@ bool Initialization ()
         G_names_of_functions[i].name = (char *) calloc (C_max_len, sizeof (char));
         G_names_of_functions[i].name = "";
         G_names_of_functions[i].mean = C_poison;
+
+        G_arr_for_printf[i].name = (char *) calloc (C_max_len, sizeof (char));
+        G_arr_for_printf[i].name = "";
+        G_arr_for_printf[i].mean = C_poison;
     }
 
     const char name_of_file[] = "input.txt";
@@ -491,11 +500,11 @@ node_t* Get_P ()
         else if (helper == E_func)
         {
             node_t* node = Create_Node (E_ret, E_key_op); // !!! $ may be swap with next line
-            node->left = Get_Label ();
+//            node->left = Get_Label ();
 
 //            node_t* node = Get_Label ();
 //            node->left = Create_Node (E_ret, E_key_op);
-
+            G_code++;
             return node;
         }
     }
@@ -806,8 +815,6 @@ node_t* Case_Keywords (const char *str)
     }
     else if (strcmp (str, "func") == 0)
     {
-        Stack_Push (G_stack_of_keywords_names, E_func);
-
         char *helper = (char *) calloc (C_max_len, sizeof (char));
 
         if (*G_code != '_')
@@ -838,10 +845,62 @@ node_t* Case_Keywords (const char *str)
         G_names_of_functions[free].name = helper;
         G_names_of_functions[free].mean = G_cnt_of_func_labels++;
 
-        node_t* node = Create_Node (E_jmp, E_key_op);    // before function jump after (because we do not want to enter)
-        node->left = Create_Node (free, E_func_label);   // Label to call function
+//        node_t* node = Create_Node (E_jmp, E_key_op);    // before function jump after (because we do not want to enter)
+//        node->left = Create_Node (free, E_func_label);   // Label to call function
 
-        return node;
+        Stack_Push (G_stack_of_keywords_names, E_func);
+
+        return Create_Node (free, E_func_label);
+    }
+    else if (strcmp (str, "return") == 0)
+    {
+        return Create_Node (E_ret, E_key_op);
+    }
+    else if (strcmp (str, "start") == 0)
+    {
+        return Create_Node (0, E_start);
+    }
+    else if (strcmp (str, "print") == 0)
+    {
+        char *helper = (char *) calloc (C_max_len, sizeof (char));
+
+        int pos = 0;
+        int cnt_of_out = 0;
+
+        while (*G_code != '!')
+        {
+            if (*G_code == '%') cnt_of_out++;
+
+            helper[pos++] = *G_code;
+            G_code++;
+        }
+
+        helper[pos++] = *G_code;
+        G_code++;
+
+        printf ("HELPER = (%s)\n", helper);
+
+        G_arr_for_printf[G_free_for_arr_for_printf].name = helper;
+
+        if (cnt_of_out >= 1)
+        {
+            node_t* node = Create_Node (E_out, E_print);
+            node_t* helper_node = node;
+
+            for (int i = 1; i < cnt_of_out; i++)
+            {
+                helper_node->left = Create_Node (E_out, E_print);
+                helper_node = helper_node->left;
+            }
+
+            helper_node->left = Create_Node (G_free_for_arr_for_printf++, E_print);
+
+            return node;
+        }
+        else
+        {
+            return Create_Node (G_free_for_arr_for_printf++, E_print);
+        }
     }
 
     return nullptr;
@@ -1095,7 +1154,18 @@ void Print_Node_Data_In_Right_Way (node_t* node, FILE *fout)
     }
     else if (node->type == E_func_label)
     {
-        fprintf (fout,"$%d", --G_cnt_of_func_labels);
+        fprintf (fout, "$%d", --G_cnt_of_func_labels);
+        return;
+    }
+    else if (node->type == E_print)
+    {
+        if (node->data == E_out)
+        {
+            fprintf (fout, "OUT");
+            return;
+        }
+
+        fprintf (fout, "%s", G_arr_for_printf[node->data].name);
         return;
     }
 }
@@ -1105,6 +1175,9 @@ void Print_Node_Data_In_Right_Way (node_t* node, FILE *fout)
 void ASM_Dump (node_t* node)
 {
     FILE *fout = fopen ("input_for_asm", "w");
+
+    fprintf (fout, "JMP $0\n");
+
     ASM_Dfs (node, fout);
 
     fclose (fout);
@@ -1121,7 +1194,7 @@ void ASM_Dfs (node_t* node, FILE *fout)
 
     if (node->type == E_label)
     {
-        fprintf (fout, "$%d\n", G_cnt_of_labels_help++); // $
+        fprintf (fout, "$%d\n", G_cnt_of_labels_help++);
 
         node->data = E_default;
     }
@@ -1204,6 +1277,12 @@ void ASM_Make_Code (node_t* node, FILE *fout)
 {
     switch (node->type)
     {
+        case (E_start):
+        {
+            fprintf (fout, "$0\n");
+            return;
+        }
+
         case (E_int):
         {
             fprintf (fout, "PUSH %d\n", node->data / C_accuracy);
@@ -1430,7 +1509,7 @@ void ASM_Make_Code (node_t* node, FILE *fout)
         {
             if (node->data == E_default) return;
 
-            fprintf (fout, "$%d\n", G_cnt_of_labels_help++); // $
+            fprintf (fout, "$%d\n", G_cnt_of_labels_help++);
 
             return;
         }
@@ -1443,7 +1522,19 @@ void ASM_Make_Code (node_t* node, FILE *fout)
 
         case (E_func_label):
         {
-            fprintf (fout, "$%d", G_cnt_of_func_labels_help++); // $
+            fprintf (fout, "$%d\n", G_cnt_of_func_labels_help++);
+            return;
+        }
+
+        case (E_print):
+        {
+            if (node->data == E_out)
+            {
+                fprintf (fout, "OUT\n");
+                return;
+            }
+
+            fprintf (fout, "PRT %s\n", G_arr_for_printf[node->data]);
             return;
         }
 
