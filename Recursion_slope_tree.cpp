@@ -67,7 +67,7 @@ char *G_code = nullptr;
 
 int G_cnt_of_labels = 10;
 
-int G_cnt_of_labels_help = 10;
+int G_cnt_of_labels_help = 5;
 
 stack_t* G_stack_of_keywords_names = nullptr;
 
@@ -200,8 +200,7 @@ int main ()
 //    node = Simplify_Tree (node);
 
     PNG_Dump (node);
-//    ASM_Dump (node);
-
+    ASM_Dump (node);
 
     printf ("END!\n");
 
@@ -492,7 +491,7 @@ node_t* Get_P ()
         }
         else if (helper == E_while)
         {
-            return Create_Node (E_jmp, E_key_op);
+            return Create_Node (E_end, E_key_op);
 
         }
         else if (helper == E_func)
@@ -815,6 +814,8 @@ node_t* Case_Str_Is_Equal_If ()
 
     while (node2->data != E_end && node2->type != E_key_op)
     {
+        Skip_Empty_Lines ();
+
         node2 = Get_E ();
 
         if (node2->data == E_end && node2->type == E_key_op) break;
@@ -841,6 +842,31 @@ node_t* Case_Str_Is_Equal_While ()
     node_t* node = Create_Node (E_while, E_key);
 
     node->left = Get_P_With_Key ();
+
+    Skip_Empty_Lines ();
+
+    node_t* node1 = Get_E ();
+
+    Skip_Empty_Lines ();
+
+    node_t* node2 = node1;
+    node_t* res   = node1;
+
+    while (node2->data != E_end && node2->type != E_key_op)
+    {
+        node2 = Get_E ();
+
+        if (node2->data == E_end && node2->type == E_key_op) break;
+
+        res = Create_Node (E_default, E_line); // $ may be not E_line (E_helper/E_pass)
+
+        res->left  = node1;
+        res->right = node2;
+
+        node1 = res;
+    }
+
+    node->right = res;
 
     return node;
 }
@@ -1228,13 +1254,6 @@ void ASM_Dump (node_t* node)
 
 void ASM_Dfs (node_t* node, FILE *fout)
 {
-    if (node->type == E_key_op && node->data == E_jmp)
-    {
-        fprintf (fout, "JMP $%d\n", G_cnt_of_labels++);
-
-        node->data = E_default;
-    }
-
     if (node->type == E_key_op && node->data == E_ret)
     {
         fprintf (fout, "RET\n");
@@ -1283,6 +1302,49 @@ void ASM_Dfs (node_t* node, FILE *fout)
                 printf ("NE XVATAET REGISTROV!\n");
         }
 
+    }
+    else if (node->type == E_key)
+    {
+        if (node->data == E_if)
+        {
+            const int helper = G_cnt_of_labels;
+
+            if (node->left)
+            {
+                ASM_Dfs (node->left, fout);
+            }
+
+            if (node->right)
+            {
+                ASM_Dfs (node->right, fout);
+            }
+
+            ASM_Make_Code (node, fout);
+
+            fprintf (fout, "$%d\n", helper);
+        }
+        else if (node->data == E_while)
+        {
+            const int helper1 = G_cnt_of_labels;
+            const int helper2 = G_cnt_of_labels_help;
+
+            fprintf (fout, "$%d\n", G_cnt_of_labels_help++);
+
+            if (node->left)
+            {
+                ASM_Dfs (node->left, fout);
+            }
+
+            if (node->right)
+            {
+                ASM_Dfs (node->right, fout);
+            }
+
+            ASM_Make_Code (node, fout);
+
+            fprintf (fout, "JMP $%d\n", helper2);
+            fprintf (fout, "$%d\n", helper1);
+        }
     }
     else
     {
@@ -1451,7 +1513,7 @@ void ASM_Make_Code (node_t* node, FILE *fout)
 
                 case (E_func):
                 {
-                    fprintf (fout, "FUNC\n");
+//                    fprintf (fout, "FUNC\n");
                     return;
                 }
             }
@@ -1537,7 +1599,7 @@ void ASM_Make_Code (node_t* node, FILE *fout)
 
         case (E_func_label):
         {
-            fprintf (fout, "$%d\n", G_cnt_of_func_labels_help++);
+            fprintf (fout, "$%d\n", G_cnt_of_func_labels_help++);   // $
             return;
         }
 
@@ -1553,7 +1615,13 @@ void ASM_Make_Code (node_t* node, FILE *fout)
             return;
         }
 
+        case (E_line):
+        {
+            return;
+        }
+
         default:
+            Dump_Node (node);
             printf ("TOP 10 OSHIBOK CHELOVECHESTVA (NEVOZMOZNO:D)\n");
     }
 }
