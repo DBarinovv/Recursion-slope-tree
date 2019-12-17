@@ -1572,6 +1572,11 @@ void Dfs_For_Make_Code_From_Tree (node_t* node, FILE *fout)
     }
     else
     {
+        int ok = 0;
+        if (node->type == E_op && node->data != E_equal) ok = 1;
+
+        if (ok) fprintf (fout, "(");
+
         if (node->left)
         {
             Dfs_For_Make_Code_From_Tree (node->left, fout);
@@ -1583,6 +1588,8 @@ void Dfs_For_Make_Code_From_Tree (node_t* node, FILE *fout)
         {
             Dfs_For_Make_Code_From_Tree (node->right, fout);
         }
+
+        if (ok) fprintf (fout, ")");
     }
 }
 
