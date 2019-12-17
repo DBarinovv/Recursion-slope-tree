@@ -168,6 +168,20 @@ void ASM_Dfs (node_t* node, FILE *fout);
 void ASM_Make_Code (node_t* node, FILE *fout);
 
 //=============================================================================
+//                           MAKE CODE FROM TREE                              ;
+//=============================================================================
+
+void Make_Code_From_Tree (node_t* node);
+
+void Dfs_For_Make_Code_From_Tree (node_t* node, FILE *fout);
+
+void Print_In_Right_Form (node_t* node, FILE *fout);
+
+void Print_In_Right_Form_For_E_op (node_t* node, FILE *fout);
+
+void Print_In_Right_Form_For_E_key_op (node_t* node, FILE *fout);
+
+//=============================================================================
 //                              SIMPLIFY TREE                                 ;
 //=============================================================================
 
@@ -201,6 +215,7 @@ int main ()
 
     PNG_Dump (node);
     ASM_Dump (node);
+    Make_Code_From_Tree (node);
 
     printf ("END!\n");
 
@@ -938,7 +953,7 @@ node_t* Case_Str_Is_Equal_Print ()
     helper[pos++] = *G_code;
     G_code++;
 
-    printf ("HELPER = (%s)\n", helper);
+//    printf ("HELPER = (%s)\n", helper);
 
     G_arr_for_printf[G_free_for_arr_for_printf].name = helper;
 
@@ -1048,77 +1063,8 @@ void Print_Node_Data_In_Right_Way (node_t* node, FILE *fout)
 
         case (E_op):
         {
-            switch (node->data)
-            {
-                case (E_plus):
-                {
-                    fprintf (fout, "+");
-                    return;
-                }
-
-                case (E_minus):
-                {
-                    fprintf (fout, "-");
-                    return;
-                }
-
-                case (E_mult):
-                {
-                    fprintf (fout, "*");
-                    return;
-                }
-
-                case (E_div):
-                {
-                    fprintf (fout, "/");
-                    return;
-                }
-
-                case (E_equal):
-                {
-                    fprintf (fout, "=");
-                    return;
-                }
-
-                case (E_sin):
-                {
-                    fprintf (fout, "sin");
-                    return;
-                }
-
-                case (E_cos):
-                {
-                    fprintf (fout, "cos");
-                    return;
-                }
-
-                case (E_pow):
-                {
-                    fprintf (fout, "pow");
-                    return;
-                }
-
-                case (E_dif):
-                {
-                    fprintf (fout, "dif");
-                    return;
-                }
-
-                case (E_log):
-                {
-                    fprintf (fout, "log");
-                    return;
-                }
-
-                case (E_exp):
-                {
-                    fprintf (fout, "exp");
-                    return;
-                }
-
-                default:
-                    printf ("NET TAKOGO OPERATORA, ERROR!!!\n");
-            }
+            Print_In_Right_Form_For_E_op (node, fout);
+            return;
         }
 
         case (E_key):
@@ -1150,69 +1096,8 @@ void Print_Node_Data_In_Right_Way (node_t* node, FILE *fout)
 
         case (E_key_op):
         {
-            switch (node->data)
-            {
-                case (E_ja):
-                {
-                    fprintf (fout, ">");
-                    return;
-                }
-
-                case (E_jb):
-                {
-                    fprintf (fout, "<");
-                    return;
-                }
-
-                case (E_jae):
-                {
-                    fprintf (fout, ">=");
-                    return;
-                }
-
-                case (E_jbe):
-                {
-                    fprintf (fout, "<=");
-                    return;
-                }
-
-                case (E_jne):
-                {
-                    fprintf (fout, "!=");
-                    return;
-                }
-
-                case (E_je):
-                {
-                    fprintf (fout, "==");
-                    return;
-                }
-
-                case (E_jmp):
-                {
-                    fprintf (fout, "JMP");
-                    return;
-                }
-
-                case (E_ret):
-                {
-                    fprintf (fout, "RET");
-                    return;
-                }
-
-                case (E_end):
-                {
-                    fprintf (fout, "END");
-                    return;
-                }
-
-                default:
-                {
-                    printf ("NO E_KEY_OP LIKE THIS!\n");
-                    printf ("NODE->DATA = [%d]\n", node->data);
-
-                }
-            }
+            Print_In_Right_Form_For_E_key_op (node, fout);
+            return;
         }
 
         case (E_line):
@@ -1635,6 +1520,266 @@ void ASM_Make_Code (node_t* node, FILE *fout)
         default:
             Dump_Node (node);
             printf ("TOP 10 OSHIBOK CHELOVECHESTVA (NEVOZMOZNO:D)\n");
+    }
+}
+
+//=============================================================================
+
+void Make_Code_From_Tree (node_t* node)
+{
+    FILE *fout = fopen ("make_code_back", "w");
+
+    Dfs_For_Make_Code_From_Tree (node, fout);
+
+    fclose (fout);
+}
+
+//-----------------------------------------------------------------------------
+
+void Dfs_For_Make_Code_From_Tree (node_t* node, FILE *fout)
+{
+    if (node->type == E_key)
+    {
+        if (node->data == E_if)
+        {
+            fprintf (fout, "%s(", C_keywords_names[E_if_ind]);
+
+            if (node->left)
+            {
+                Dfs_For_Make_Code_From_Tree (node->left, fout);
+            }
+
+            fprintf (fout, ")\n");
+
+            if (node->right)
+            {
+                Dfs_For_Make_Code_From_Tree (node->right, fout);
+            }
+
+            fprintf (fout, "\n;\n");
+        }
+        else if (node->data == E_while)
+        {
+            fprintf (fout, "%s(", C_keywords_names[E_while_ind]);
+
+            if (node->right)
+            {
+                Dfs_For_Make_Code_From_Tree (node->right, fout);
+            }
+
+            fprintf (fout, ")\n");
+        }
+    }
+    else
+    {
+        if (node->left)
+        {
+            Dfs_For_Make_Code_From_Tree (node->left, fout);
+        }
+
+        Print_In_Right_Form (node, fout);
+
+        if (node->right)
+        {
+            Dfs_For_Make_Code_From_Tree (node->right, fout);
+        }
+    }
+}
+
+//-----------------------------------------------------------------------------
+
+void Print_In_Right_Form (node_t* node, FILE *fout)
+{
+    switch (node->type)
+    {
+        case (E_scope):
+        {
+            if (node->data == 0)
+            {
+                fprintf (fout, "%s\n", C_keywords_names[E_start_ind]);
+                return;
+            }
+            else if (node->data == 1)
+            {
+                fprintf (fout, "%s\n", C_keywords_names[E_end_ind]);
+                return;
+            }
+        }
+
+        case (E_int):
+        {
+            fprintf (fout, "%.0lf", (double) node->data / C_accuracy); // $ may be another
+            return;
+        }
+
+        case (E_str):
+        {
+            fprintf (fout, "%s", G_names_of_variables[node->data].name);
+            return;
+        }
+
+        case (E_op):
+        {
+            Print_In_Right_Form_For_E_op (node, fout);
+            return;
+        }
+
+        case (E_key):
+        {
+            return;
+//            if (node->data == E_if)
+//            {
+//                return;
+//            }
+        }
+
+        case (E_key_op):
+        {
+            Print_In_Right_Form_For_E_key_op (node, fout);
+            return;
+        }
+
+        case (E_line):
+        {
+            fprintf (fout, "\n");
+            return;
+        }
+
+        case (E_call):
+        {
+            for (int i = 0; i < C_max_cnt_of_names; i++)
+            {
+                if (G_names_of_functions[i].mean == node->data)
+                {
+                    fprintf (fout, "%s", G_names_of_functions[i].name);
+                    return;
+                }
+
+                printf ("VERY STRANNO");
+            }
+        }
+
+        case (E_print):
+        {
+            if (node->data == E_out)
+            {
+                fprintf (fout, "%");
+                return;
+            }
+
+            fprintf (fout, "%s", C_keywords_names[E_print_ind]);
+            fprintf (fout, "%s", G_arr_for_printf[node->data].name);
+            return;
+        }
+    }
+}
+
+//-----------------------------------------------------------------------------
+
+void Print_In_Right_Form_For_E_op (node_t* node, FILE *fout)
+{
+    switch (node->data)
+    {
+        case (E_plus):
+        {
+            fprintf (fout, "+");
+            return;
+        }
+
+        case (E_minus):
+        {
+            fprintf (fout, "-");
+            return;
+        }
+
+        case (E_mult):
+        {
+            fprintf (fout, "*");
+            return;
+        }
+
+        case (E_div):
+        {
+            fprintf (fout, "/");
+            return;
+        }
+
+        case (E_equal):
+        {
+            fprintf (fout, "=");
+            return;
+        }
+
+        default:
+            printf ("NET TAKOGO OPERATORA, ERROR!!!\n");
+    }
+}
+
+//-----------------------------------------------------------------------------
+
+void Print_In_Right_Form_For_E_key_op (node_t* node, FILE *fout)
+{
+    switch (node->data)
+    {
+        case (E_ja):
+        {
+            fprintf (fout, ">");
+            return;
+        }
+
+        case (E_jb):
+        {
+            fprintf (fout, "<");
+            return;
+        }
+
+        case (E_jae):
+        {
+            fprintf (fout, ">=");
+            return;
+        }
+
+        case (E_jbe):
+        {
+            fprintf (fout, "<=");
+            return;
+        }
+
+        case (E_jne):
+        {
+            fprintf (fout, "!=");
+            return;
+        }
+
+        case (E_je):
+        {
+            fprintf (fout, "==");
+            return;
+        }
+
+        case (E_jmp):
+        {
+            fprintf (fout, "JMP");
+            return;
+        }
+
+        case (E_ret):
+        {
+            fprintf (fout, "RET");
+            return;
+        }
+
+        case (E_end):
+        {
+            fprintf (fout, "END");
+            return;
+        }
+
+        default:
+        {
+            printf ("NO E_KEY_OP LIKE THIS!\n");
+            printf ("NODE->DATA = [%d]\n", node->data);
+        }
     }
 }
 
