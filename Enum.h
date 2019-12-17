@@ -7,14 +7,13 @@ enum types
     E_int  = 1,
     E_str  = 2,
     E_op   = 3,
-    E_line = 4,
-    E_key  = 5,
-    E_key_op = 6,
-    E_label  = 7,    // $
-    E_call   = 8,
-    E_func_label = 9,
+    E_key  = 4,
+    E_key_op = 5,
+    E_line = 6,
+    E_call = 7,
+    E_func_label = 8,
 
-    E_print = 10,
+    E_print = 9,
 };
 
 enum operations
@@ -54,8 +53,9 @@ enum keywords_opers
 
     E_jmp  = 207,
     E_ret  = 208,
+    E_end  = 209,
 
-    E_out = 209
+    E_out = 210,
 };
 
 enum keywords_names

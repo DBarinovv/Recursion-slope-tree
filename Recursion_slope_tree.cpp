@@ -27,7 +27,7 @@ struct func_t
 struct node_t
 {
     int data;
-    int type;      // E_int, E_str, E_op
+    int type;
     node_t* left;
     node_t* right;
 };
@@ -94,6 +94,8 @@ void Make_Right_Array (const char *helper, const int sz_file);
 int Make_Op_For_Get_P_With_Key (const char chr1, const char chr2);
 
 void Dump_Node (node_t* node);
+
+void Skip_Empty_Lines ();
 
 //=============================================================================
 //                              RECURSION SLOPE                               ;
@@ -198,7 +200,7 @@ int main ()
 //    node = Simplify_Tree (node);
 
     PNG_Dump (node);
-    ASM_Dump (node);
+//    ASM_Dump (node);
 
 
     printf ("END!\n");
@@ -327,6 +329,13 @@ void Dump_Node (node_t* node)
     printf ("\n");
 }
 
+//-----------------------------------------------------------------------------
+
+void Skip_Empty_Lines ()
+{
+    while (*G_code == '\n' || *G_code == '$') G_code++;
+}
+
 //=============================================================================
 
 node_t* Create_Node (const int data, const int type)
@@ -363,47 +372,31 @@ node_t* Get_G ()
 
 node_t* Get_Line ()
 {
+    node_t* node1 = Get_E ();
+    node_t* node2 = node1;
+    node_t* res   = node1;
+
     int n_line = 1;
-
-    node_t* res = Create_Node (n_line++, E_line);
-
-    node_t* node = res;
-    node->left = Get_E ();
 
     while (*G_code == '\n' || *G_code == '$')
     {
-        if  (*G_code == '$')
+        Skip_Empty_Lines ();
+
+        if (*G_code == '\0' || *G_code == EOF)
         {
-            while (*G_code == '$')
-            {
-                n_line++;
-                G_code++;
-            }
+            return node1;
         }
-        else
-        {
-            G_code++;
 
-            if  (*G_code == '$')
-            {
-                while (*G_code == '$')
-                {
-                    n_line++;
-                    G_code++;
-                }
-            }
+        node2 = Get_E ();
 
-            if (*G_code != '\0' && *G_code != EOF)
-            {
-                node_t* new_res = Create_Node (n_line++, E_line);
+        res = Create_Node (E_default, E_line); // $ may be not E_line (E_helper/E_pass)
 
-                new_res->left = Get_E ();
-                node->right = new_res;
+        res->left  = node1;
+        res->right = node2;
 
-                node = new_res;
-            }
-        }
+        node1 = res;
     }
+
 
     return res;
 }
@@ -488,31 +481,23 @@ node_t* Get_P ()
     }
     else if (*G_code == ';')
     {
+        G_code++;
+
         int helper = 0;
         Stack_Pop (G_stack_of_keywords_names, &helper);
 
         if (helper == E_if)
         {
-            return Get_Label ();
+            return Create_Node (E_end, E_key_op);
         }
         else if (helper == E_while)
         {
-            node_t* node = Create_Node (E_jmp, E_key_op);
-            node->left = Get_Label ();
+            return Create_Node (E_jmp, E_key_op);
 
-//            node_t* node = Get_Label ();
-//            node->left = Create_Node (E_jmp, E_key_op);
-
-            return node;
         }
         else if (helper == E_func)
         {
-            node_t* node = Create_Node (E_ret, E_key_op); // !!! $ may be swap with next line
-//            node->left = Get_Label ();
-
-//            node_t* node = Get_Label ();
-//            node->left = Create_Node (E_ret, E_key_op);
-            G_code++;
+            node_t* node = Create_Node (E_ret, E_key_op);
             return node;
         }
     }
@@ -599,15 +584,7 @@ node_t* Get_Assn (const int pos_of_arg)
 
             G_code = helper;
 
-//            if (ok)
-//            {
-//                res->right = Get_Id ();
-//                G_names_of_variables[pos_of_arg].mean = G_names_of_variables[(res->right)->data].mean;
-//            }
-//            else
-//            {
             res->right = Get_E ();
-//            }
         }
         else
         {
@@ -654,15 +631,6 @@ node_t* Get_P_With_Key ()
     else Syntax_Error ("Get_P_With_Key have no '('\n");
 
     return nullptr;
-}
-
-//-----------------------------------------------------------------------------
-
-node_t* Get_Label ()
-{
-    G_code++;
-
-    return Create_Node (G_cnt_of_labels++, E_label);
 }
 
 //-----------------------------------------------------------------------------
@@ -833,7 +801,33 @@ node_t* Case_Str_Is_Equal_If ()
     Stack_Push (G_stack_of_keywords_names, E_if);
 
     node_t* node = Create_Node (E_if, E_key);
+
     node->left = Get_P_With_Key ();
+
+    Skip_Empty_Lines ();
+
+    node_t* node1 = Get_E ();
+
+    Skip_Empty_Lines ();
+
+    node_t* node2 = node1;
+    node_t* res   = node1;
+
+    while (node2->data != E_end && node2->type != E_key_op)
+    {
+        node2 = Get_E ();
+
+        if (node2->data == E_end && node2->type == E_key_op) break;
+
+        res = Create_Node (E_default, E_line); // $ may be not E_line (E_helper/E_pass)
+
+        res->left  = node1;
+        res->right = node2;
+
+        node1 = res;
+    }
+
+    node->right = res;
 
     return node;
 }
@@ -844,13 +838,9 @@ node_t* Case_Str_Is_Equal_While ()
 {
     Stack_Push (G_stack_of_keywords_names, E_while);
 
-    node_t *node = Get_Label ();
+    node_t* node = Create_Node (E_while, E_key);
 
-    G_code--;   // because of Get_Label
-
-    node->left = Create_Node (E_while, E_key);
-
-    (node->left)->left = Get_P_With_Key ();
+    node->left = Get_P_With_Key ();
 
     return node;
 }
@@ -1006,203 +996,218 @@ void Print_PNG (node_t* node, FILE *fout)
 
 void Print_Node_Data_In_Right_Way (node_t* node, FILE *fout)
 {
-    if (node->type == E_int)
+    switch (node->type)
     {
-        fprintf (fout, "%lf", (double) (node->data) / C_accuracy);
-    }
-    else if (node->type == E_str)
-    {
-        fprintf (fout, "%s", G_names_of_variables[node->data].name);
-    }
-    else if (node->type == E_line)
-    {
-        fprintf (fout, "LINE = [%d]", node->data);
-    }
-    else if (node->type == E_op)
-    {
-        switch (node->data)
+        case (E_start):
         {
-            case (E_plus):
-            {
-                fprintf (fout, "+");
-                return;
-            }
-
-            case (E_minus):
-            {
-                fprintf (fout, "-");
-                return;
-            }
-
-            case (E_mult):
-            {
-                fprintf (fout, "*");
-                return;
-            }
-
-            case (E_div):
-            {
-                fprintf (fout, "/");
-                return;
-            }
-
-            case (E_equal):
-            {
-                fprintf (fout, "=");
-                return;
-            }
-
-            case (E_sin):
-            {
-                fprintf (fout, "sin");
-                return;
-            }
-
-            case (E_cos):
-            {
-                fprintf (fout, "cos");
-                return;
-            }
-
-            case (E_pow):
-            {
-                fprintf (fout, "pow");
-                return;
-            }
-
-            case (E_dif):
-            {
-                fprintf (fout, "dif");
-                return;
-            }
-
-            case (E_log):
-            {
-                fprintf (fout, "log");
-                return;
-            }
-
-            case (E_exp):
-            {
-                fprintf (fout, "exp");
-                return;
-            }
-
-            default:
-                printf ("NET TAKOGO OPERATORA, ERROR!!!\n");
-        }
-    }
-    else if (node->type == E_key_op)
-    {
-        switch (node->data)
-        {
-            case (E_ja):
-            {
-                fprintf (fout, ">");
-                return;
-            }
-
-            case (E_jb):
-            {
-                fprintf (fout, "<");
-                return;
-            }
-
-            case (E_jae):
-            {
-                fprintf (fout, ">=");
-                return;
-            }
-
-            case (E_jbe):
-            {
-                fprintf (fout, "<=");
-                return;
-            }
-
-            case (E_jne):
-            {
-                fprintf (fout, "!=");
-                return;
-            }
-
-            case (E_je):
-            {
-                fprintf (fout, "==");
-                return;
-            }
-
-            case (E_jmp):
-            {
-                fprintf (fout, "JMP");
-                return;
-            }
-
-            case (E_ret):
-            {
-                fprintf (fout, "RET");
-                return;
-            }
-
-            default:
-            {
-                printf ("NO E_KEY_OP LIKE THIS!\n");
-                printf ("NODE->DATA = [%d]\n", node->data);
-
-            }
-        }
-    }
-    else if (node->type == E_key)
-    {
-        switch (node->data)
-        {
-            case (E_if):
-            {
-                fprintf (fout, "if");
-                return;
-            }
-
-            case (E_while):
-            {
-                fprintf (fout, "while");
-                return;
-            }
-
-            case (E_func):
-            {
-                fprintf (fout, "func");
-                return;
-            }
-
-            default:
-                printf ("NO E_KEY LIKE THIS!\n");
-        }
-    }
-    else if (node->type == E_label)
-    {
-        fprintf (fout, "$%d", --G_cnt_of_labels);
-        return;
-    }
-    else if (node->type == E_call)
-    {
-        fprintf (fout, "CALL");
-        return;
-    }
-    else if (node->type == E_func_label)
-    {
-        fprintf (fout, "$%d", --G_cnt_of_func_labels);
-        return;
-    }
-    else if (node->type == E_print)
-    {
-        if (node->data == E_out)
-        {
-            fprintf (fout, "OUT");
+            fprintf (fout, "START");
             return;
         }
 
-        fprintf (fout, "%s", G_arr_for_printf[node->data].name);
-        return;
+        case (E_int):
+        {
+            fprintf (fout, "%lf", (double) (node->data) / C_accuracy);
+            return;
+        }
+
+        case (E_str):
+        {
+            fprintf (fout, "%s", G_names_of_variables[node->data].name);
+            return;
+        }
+
+        case (E_op):
+        {
+            switch (node->data)
+            {
+                case (E_plus):
+                {
+                    fprintf (fout, "+");
+                    return;
+                }
+
+                case (E_minus):
+                {
+                    fprintf (fout, "-");
+                    return;
+                }
+
+                case (E_mult):
+                {
+                    fprintf (fout, "*");
+                    return;
+                }
+
+                case (E_div):
+                {
+                    fprintf (fout, "/");
+                    return;
+                }
+
+                case (E_equal):
+                {
+                    fprintf (fout, "=");
+                    return;
+                }
+
+                case (E_sin):
+                {
+                    fprintf (fout, "sin");
+                    return;
+                }
+
+                case (E_cos):
+                {
+                    fprintf (fout, "cos");
+                    return;
+                }
+
+                case (E_pow):
+                {
+                    fprintf (fout, "pow");
+                    return;
+                }
+
+                case (E_dif):
+                {
+                    fprintf (fout, "dif");
+                    return;
+                }
+
+                case (E_log):
+                {
+                    fprintf (fout, "log");
+                    return;
+                }
+
+                case (E_exp):
+                {
+                    fprintf (fout, "exp");
+                    return;
+                }
+
+                default:
+                    printf ("NET TAKOGO OPERATORA, ERROR!!!\n");
+            }
+        }
+
+        case (E_key):
+        {
+            switch (node->data)
+            {
+                case (E_if):
+                {
+                    fprintf (fout, "if");
+                    return;
+                }
+
+                case (E_while):
+                {
+                    fprintf (fout, "while");
+                    return;
+                }
+
+                case (E_func):
+                {
+                    fprintf (fout, "func");
+                    return;
+                }
+
+                default:
+                    printf ("NO E_KEY LIKE THIS!\n");
+            }
+        }
+
+        case (E_key_op):
+        {
+            switch (node->data)
+            {
+                case (E_ja):
+                {
+                    fprintf (fout, ">");
+                    return;
+                }
+
+                case (E_jb):
+                {
+                    fprintf (fout, "<");
+                    return;
+                }
+
+                case (E_jae):
+                {
+                    fprintf (fout, ">=");
+                    return;
+                }
+
+                case (E_jbe):
+                {
+                    fprintf (fout, "<=");
+                    return;
+                }
+
+                case (E_jne):
+                {
+                    fprintf (fout, "!=");
+                    return;
+                }
+
+                case (E_je):
+                {
+                    fprintf (fout, "==");
+                    return;
+                }
+
+                case (E_jmp):
+                {
+                    fprintf (fout, "JMP");
+                    return;
+                }
+
+                case (E_ret):
+                {
+                    fprintf (fout, "RET");
+                    return;
+                }
+
+                case (E_end):
+                {
+                    fprintf (fout, "END");
+                    return;
+                }
+
+                default:
+                {
+                    printf ("NO E_KEY_OP LIKE THIS!\n");
+                    printf ("NODE->DATA = [%d]\n", node->data);
+
+                }
+            }
+        }
+
+        case (E_line):
+        {
+            fprintf (fout, "LINE = [%d]\n", node->data);
+            return;
+        }
+
+        case (E_call):
+        {
+            fprintf (fout, "CALL");
+            return;
+        }
+
+        case (E_print):
+        {
+            if (node->data == E_out)
+            {
+                fprintf (fout, "OUT");
+                return;
+            }
+
+            fprintf (fout, "%s", G_arr_for_printf[node->data].name);
+            return;
+        }
     }
 }
 
@@ -1223,18 +1228,6 @@ void ASM_Dump (node_t* node)
 
 void ASM_Dfs (node_t* node, FILE *fout)
 {
-    if (node->type == E_line)
-    {
-        fprintf (fout, "\n");
-    }
-
-    if (node->type == E_label)
-    {
-        fprintf (fout, "$%d\n", G_cnt_of_labels_help++);
-
-        node->data = E_default;
-    }
-
     if (node->type == E_key_op && node->data == E_jmp)
     {
         fprintf (fout, "JMP $%d\n", G_cnt_of_labels++);
@@ -1439,11 +1432,6 @@ void ASM_Make_Code (node_t* node, FILE *fout)
             }
         }
 
-        case (E_line):
-        {
-            return;
-        }
-
         case (E_key):
         {
             switch (node->data)
@@ -1541,15 +1529,6 @@ void ASM_Make_Code (node_t* node, FILE *fout)
             }
         }
 
-        case (E_label):
-        {
-            if (node->data == E_default) return;
-
-            fprintf (fout, "$%d\n", G_cnt_of_labels_help++);
-
-            return;
-        }
-
         case (E_call):
         {
             fprintf (fout, "CALL $%d\n", node->data);
@@ -1592,8 +1571,6 @@ node_t* Simplify_Tree (node_t* node)
     {
         node->right = Simplify_Tree (node->right);
     }
-
-    if (node->type != E_line) node = Unit (node);
 
     return node;
 }
