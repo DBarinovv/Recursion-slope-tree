@@ -362,6 +362,7 @@ node_t* Get_G ()
     else
     {
         Syntax_Error ("Get_G");
+        printf ("G_code = (%c)\n", *G_code);
     }
 
     return nullptr;
@@ -783,11 +784,15 @@ node_t* Case_Keywords (const char *str)
     }
     else if (strcmp (str, C_keywords_names[E_start_ind]) == 0)
     {
-        return Create_Node (0, E_start);
+        return Create_Node (0, E_scope);
     }
     else if (strcmp (str, C_keywords_names[E_print_ind]) == 0)
     {
         return Case_Str_Is_Equal_Print ();
+    }
+    else if (strcmp (str, C_keywords_names[E_end_ind]) == 0)
+    {
+        return Create_Node (1, E_scope);
     }
 
     return nullptr;
@@ -937,25 +942,16 @@ node_t* Case_Str_Is_Equal_Print ()
 
     G_arr_for_printf[G_free_for_arr_for_printf].name = helper;
 
-    if (cnt_of_out >= 1)
+    node_t* node = Create_Node (G_free_for_arr_for_printf++, E_print);
+    node_t* helper_node = node;
+
+    for (int i = 0; i < cnt_of_out; i++)
     {
-        node_t* node = Create_Node (E_out, E_print);
-        node_t* helper_node = node;
-
-        for (int i = 1; i < cnt_of_out; i++)
-        {
-            helper_node->left = Create_Node (E_out, E_print);
-            helper_node = helper_node->left;
-        }
-
-        helper_node->left = Create_Node (G_free_for_arr_for_printf++, E_print);
-
-        return node;
+        helper_node->left = Create_Node (E_out, E_print);
+        helper_node = helper_node->left;
     }
-    else
-    {
-        return Create_Node (G_free_for_arr_for_printf++, E_print);
-    }
+
+    return node;
 }
 
 //=============================================================================
@@ -1024,10 +1020,18 @@ void Print_Node_Data_In_Right_Way (node_t* node, FILE *fout)
 {
     switch (node->type)
     {
-        case (E_start):
+        case (E_scope):
         {
-            fprintf (fout, "START");
-            return;
+            if (node->data == 0)
+            {
+                fprintf (fout, "START");
+                return;
+            }
+            else if (node->data == 1)
+            {
+                fprintf (fout, "END");
+                return;
+            }
         }
 
         case (E_int):
@@ -1368,10 +1372,18 @@ void ASM_Make_Code (node_t* node, FILE *fout)
 {
     switch (node->type)
     {
-        case (E_start):
+        case (E_scope):
         {
-            fprintf (fout, "$0\n");
-            return;
+            if (node->data == 0)
+            {
+                fprintf (fout, "$0\n");
+                return;
+            }
+            else if (node->data == 1)
+            {
+                fprintf (fout, "END\n");
+                return;
+            }
         }
 
         case (E_int):
@@ -1611,7 +1623,7 @@ void ASM_Make_Code (node_t* node, FILE *fout)
                 return;
             }
 
-            fprintf (fout, "PRT %s\n", G_arr_for_printf[node->data]);
+            fprintf (fout, "PRT %s\n", G_arr_for_printf[node->data].name);
             return;
         }
 

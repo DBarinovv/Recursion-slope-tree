@@ -2,7 +2,7 @@
 
 enum types
 {
-    E_start = 0,
+    E_scope = 0,
 
     E_int  = 1,
     E_str  = 2,
@@ -66,6 +66,7 @@ enum keywords_names
     E_ret_ind   = 3,
     E_start_ind = 4,
     E_print_ind = 5,
+    E_end_ind   = 6,
 };
 
 const char *C_keywords_names[] = {
@@ -75,4 +76,5 @@ const char *C_keywords_names[] = {
                             "htnthy",  // return
                             "cnfhn",   // start
                             "ghbyn",   // print
+                            "rjytw",   // end
                             };
