@@ -3,9 +3,9 @@
 >[Мой асемблер](https://github.com/DBarinovv/cpu)
 ---
 **Для написания языка нам потребуется**:
-* [*рекурсивный спуск*](https://github.com/DBarinovv/Recursion-slope-tree/new/master?readme=1#немного-о-рекурсивном-спуске)
-* [*свой синтаксис*](https://github.com/DBarinovv/Recursion-slope-tree/new/master?readme=1#синтаксис)
-* [*сгенерировать по дереву ассемблерный код*](https://github.com/DBarinovv/Recursion-slope-tree/new/master?readme=1#генерация-кода-по-дереву)
+* [*рекурсивный спуск*](https://github.com/DBarinovv/Recursion-slope-tree/#немного-о-рекурсивном-спуске)
+* [*свой синтаксис*](https://github.com/DBarinovv/Recursion-slope-tree/#синтаксис)
+* [*сгенерировать по дереву ассемблерный код*](https://github.com/DBarinovv/Recursion-slope-tree/#генерация-кода-по-дереву)
 
 ---
 
